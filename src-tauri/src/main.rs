@@ -34,10 +34,15 @@ fn main() {
             search_staff,
             get_staff_by_nic,
 
-            // Print commands
+            // PDF generation commands
+            generate_staff_pdf,
+            generate_bulk_staff_pdf,
+            export_staff_pdf,
+            open_downloads_folder,
+
+            // Legacy print commands (now generate PDFs)
             print_staff_individual,
-            print_staff_bulk,
-            export_staff_pdf
+            print_staff_bulk
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

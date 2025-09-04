@@ -1,11 +1,46 @@
-use tauri::{command, AppHandle}; // removed unused `Manager`
+use tauri::{command, AppHandle};
 use crate::database::{
-    operations::get_staff_by_id as db_get_staff_by_id, // only what's used
+    operations::get_staff_by_id as db_get_staff_by_id,
+    operations::get_all_staff as db_get_all_staff,
     schema::Staff,
 };
+use std::fs;
+use genpdf::elements::{Paragraph, TableLayout, LinearLayout};
+use genpdf::fonts;
+use genpdf::{Document, Element, SimplePageDecorator};
+use std::path::PathBuf;
+
+fn get_downloads_dir() -> Result<PathBuf, String> {
+    // Try to get downloads directory using different methods
+    if let Some(user_dirs) = directories::UserDirs::new() {
+        if let Some(downloads) = user_dirs.download_dir() {
+            return Ok(downloads.to_path_buf());
+        }
+    }
+
+    // Fallback to home directory + Downloads
+    if let Some(home) = std::env::var_os("HOME") {
+        let mut path = PathBuf::from(home);
+        path.push("Downloads");
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
+    // Windows fallback
+    if let Some(userprofile) = std::env::var_os("USERPROFILE") {
+        let mut path = PathBuf::from(userprofile);
+        path.push("Downloads");
+        if path.exists() {
+            return Ok(path);
+        }
+    }
+
+    Err("Could not find Downloads directory".to_string())
+}
 
 #[command]
-pub async fn print_staff_individual(
+pub async fn generate_staff_pdf(
     app_handle: AppHandle,
     staff_id: String,
 ) -> Result<String, String> {
@@ -14,15 +49,31 @@ pub async fn print_staff_individual(
         .app_data_dir()
         .ok_or("Failed to resolve app data directory")?;
 
+    // Get staff data
     let staff = db_get_staff_by_id(&app_data_dir, &staff_id)
         .map_err(|e| format!("Failed to get staff: {}", e))?;
 
-    let html_template = generate_individual_print_template(&staff);
-    Ok(html_template)
+    // Generate PDF
+    let pdf_content = generate_individual_pdf(&staff)?;
+
+    // Generate filename
+    let filename = format!("staff-details-{}-{}.pdf",
+                          staff.full_name.replace(" ", "_"),
+                          chrono::Utc::now().format("%Y%m%d"));
+
+    // Get downloads directory
+    let downloads_dir = get_downloads_dir()?;
+    let file_path = downloads_dir.join(&filename);
+
+    // Write PDF file
+    fs::write(&file_path, pdf_content)
+        .map_err(|e| format!("Failed to write PDF file: {}", e))?;
+
+    Ok(format!("PDF saved to Downloads: {}", filename))
 }
 
 #[command]
-pub async fn print_staff_bulk(
+pub async fn generate_bulk_staff_pdf(
     app_handle: AppHandle,
     staff_ids: Vec<String>,
 ) -> Result<String, String> {
@@ -31,16 +82,41 @@ pub async fn print_staff_bulk(
         .app_data_dir()
         .ok_or("Failed to resolve app data directory")?;
 
+    // Get staff data
     let mut staff_list = Vec::new();
 
-    for staff_id in staff_ids {
-        let staff = db_get_staff_by_id(&app_data_dir, &staff_id)
-            .map_err(|e| format!("Failed to get staff: {}", e))?;
-        staff_list.push(staff);
+    if staff_ids.is_empty() {
+        staff_list = db_get_all_staff(&app_data_dir)
+            .map_err(|e| format!("Failed to get all staff: {}", e))?;
+    } else {
+        for staff_id in staff_ids {
+            let staff = db_get_staff_by_id(&app_data_dir, &staff_id)
+                .map_err(|e| format!("Failed to get staff: {}", e))?;
+            staff_list.push(staff);
+        }
     }
 
-    let html_template = generate_bulk_print_template(&staff_list);
-    Ok(html_template)
+    if staff_list.is_empty() {
+        return Err("No staff data to export".to_string());
+    }
+
+    // Generate PDF
+    let pdf_content = generate_bulk_pdf(&staff_list)?;
+
+    // Generate filename
+    let filename = format!("staff-directory-{}-{}.pdf",
+                          staff_list.len(),
+                          chrono::Utc::now().format("%Y%m%d"));
+
+    // Get downloads directory
+    let downloads_dir = get_downloads_dir()?;
+    let file_path = downloads_dir.join(&filename);
+
+    // Write PDF file
+    fs::write(&file_path, pdf_content)
+        .map_err(|e| format!("Failed to write PDF file: {}", e))?;
+
+    Ok(format!("PDF saved to Downloads: {} ({} staff records)", filename, staff_list.len()))
 }
 
 #[command]
@@ -49,273 +125,277 @@ pub async fn export_staff_pdf(
     staff_ids: Vec<String>,
     is_bulk: bool,
 ) -> Result<String, String> {
-    if is_bulk {
-        print_staff_bulk(app_handle, staff_ids).await
+    if is_bulk || staff_ids.len() > 1 {
+        generate_bulk_staff_pdf(app_handle, staff_ids).await
     } else {
         if staff_ids.is_empty() {
             return Err("No staff ID provided".to_string());
         }
-        print_staff_individual(app_handle, staff_ids[0].clone()).await
+        generate_staff_pdf(app_handle, staff_ids[0].clone()).await
     }
 }
 
-fn generate_individual_print_template(staff: &Staff) -> String {
-    // prepare image HTML (insert base64 if present)
-    let image_html = if let Some(ref data) = staff.image_data {
-        // insert the base64 payload into the image div
-        format!(
-            r#"<div class="staff-photo" style="background-image: url('data:image/jpeg;base64,{}'); background-size: cover; background-position: center;"></div>"#,
-            data
-        )
-    } else {
-        r#"<div class="staff-photo" style="background-color: #ecf0f1; display: flex; align-items: center; justify-content: center; color: #95a5a6;">No Photo</div>"#.to_string()
-    };
+#[command]
+pub async fn open_downloads_folder() -> Result<String, String> {
+    let downloads_dir = get_downloads_dir()?;
 
-    format!(
-        r#"
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>Staff Details - {}</title>
-            <style>
-                @page {{ margin: 20px; }}
-                body {{ font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #333; }}
-                .header {{ text-align: center; margin-bottom: 30px; border-bottom: 3px solid #2c3e50; padding-bottom: 20px; }}
-                .header h1 {{ color: #2c3e50; margin: 0; font-size: 28px; }}
-                .header h2 {{ color: #34495e; margin: 5px 0; font-size: 18px; font-weight: normal; }}
-                .staff-photo {{ float: right; width: 120px; height: 150px; border: 2px solid #bdc3c7; margin-left: 20px; }}
-                .staff-info {{ overflow: hidden; }}
-                .section {{ margin-bottom: 25px; }}
-                .section-title {{ background: #ecf0f1; padding: 10px; margin-bottom: 15px; font-weight: bold; color: #2c3e50; border-left: 4px solid #3498db; }}
-                .field-row {{ display: flex; margin-bottom: 8px; }}
-                .field-label {{ width: 200px; font-weight: bold; color: #34495e; }}
-                .field-value {{ flex: 1; color: #2c3e50; }}
-                .address {{ margin-top: 5px; }}
-                .footer {{ margin-top: 40px; text-align: center; color: #7f8c8d; font-size: 12px; }}
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>Divisional Forest Office</h1>
-                <h2>Vavuniya, Sri Lanka</h2>
-                <h2>Staff Information Sheet</h2>
-            </div>
+    #[cfg(target_os = "windows")]
+    {
+        std::process::Command::new("explorer")
+            .arg(&downloads_dir)
+            .spawn()
+            .map_err(|e| format!("Failed to open Downloads folder: {}", e))?;
+    }
 
-            <div class="staff-info">
-                {}
+    #[cfg(target_os = "macos")]
+    {
+        std::process::Command::new("open")
+            .arg(&downloads_dir)
+            .spawn()
+            .map_err(|e| format!("Failed to open Downloads folder: {}", e))?;
+    }
 
-                <div class="section">
-                    <div class="section-title">Personal Information</div>
-                    <div class="field-row">
-                        <div class="field-label">Appointment Number:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Full Name:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Gender:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Date of Birth:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Age:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">NIC Number:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Marital Status:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Address:</div>
-                        <div class="field-value address">
-                            {}<br/>
-                            {}<br/>
-                            {}
-                        </div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Contact Number:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Email:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                </div>
+    #[cfg(target_os = "linux")]
+    {
+        std::process::Command::new("xdg-open")
+            .arg(&downloads_dir)
+            .spawn()
+            .map_err(|e| format!("Failed to open Downloads folder: {}", e))?;
+    }
 
-                <div class="section">
-                    <div class="section-title">Employment Details</div>
-                    <div class="field-row">
-                        <div class="field-label">Designation:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Date of First Appointment:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Date of Retirement:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Increment Date:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                </div>
-
-                <div class="section">
-                    <div class="section-title">Salary Information</div>
-                    <div class="field-row">
-                        <div class="field-label">Salary Code:</div>
-                        <div class="field-value">{}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Basic Salary:</div>
-                        <div class="field-value">Rs. {:.2}</div>
-                    </div>
-                    <div class="field-row">
-                        <div class="field-label">Increment Amount:</div>
-                        <div class="field-value">Rs. {:.2}</div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="footer">
-                Generated on {} | Divisional Forest Office - Vavuniya, Sri Lanka
-            </div>
-        </body>
-        </html>
-        "#,
-        // 1: title -> use full name (or change to appointment number if you prefer)
-        staff.full_name,
-        // 2: image html (already contains base64 when present)
-        image_html,
-        // 3..21: the rest in order
-        staff.appointment_number,
-        staff.full_name,
-        staff.gender,
-        staff.date_of_birth,
-        staff.age,
-        staff.nic_number,
-        staff.marital_status,
-        staff.address_line1.as_deref().unwrap_or(""),
-        staff.address_line2.as_deref().unwrap_or(""),
-        staff.address_line3.as_deref().unwrap_or(""),
-        staff.contact_number.as_deref().unwrap_or("N/A"),
-        staff.email.as_deref().unwrap_or("N/A"),
-        staff.designation,
-        staff.date_of_first_appointment,
-        staff.date_of_retirement,
-        staff.increment_date.as_deref().unwrap_or("N/A"),
-        staff.salary_code,
-        staff.basic_salary,
-        staff.increment_amount,
-        // 22: timestamp
-        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
-    )
+    Ok(format!("Downloads folder opened: {}", downloads_dir.display()))
 }
 
-fn generate_bulk_print_template(staff_list: &[Staff]) -> String {
-    let mut table_rows = String::new();
+// Legacy functions for backward compatibility
+#[command]
+pub async fn print_staff_individual(
+    app_handle: AppHandle,
+    staff_id: String,
+) -> Result<String, String> {
+    generate_staff_pdf(app_handle, staff_id).await
+}
 
+#[command]
+pub async fn print_staff_bulk(
+    app_handle: AppHandle,
+    staff_ids: Vec<String>,
+) -> Result<String, String> {
+    generate_bulk_staff_pdf(app_handle, staff_ids).await
+}
+
+fn generate_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String> {
+    // Create a new PDF document
+    let font_family = fonts::from_files("./fonts", "DejaVuSans", None)
+        .unwrap_or_else(|_| fonts::builtin::HELVETICA);
+
+    let mut doc = Document::new(font_family);
+    doc.set_title("Staff Details");
+    doc.set_minimal_conformance();
+    doc.set_line_spacing(1.25);
+
+    // Create page decorator
+    let decorator = SimplePageDecorator::new(doc.get_font(), 10, "Divisional Forest Office - Vavuniya, Sri Lanka", None);
+    doc.set_page_decorator(Box::new(decorator));
+
+    // Header
+    doc.push(
+        Paragraph::new("Divisional Forest Office")
+            .aligned(genpdf::Alignment::Center)
+            .styled(genpdf::style::Style::new().bold().with_font_size(20))
+    );
+
+    doc.push(
+        Paragraph::new("Vavuniya, Sri Lanka")
+            .aligned(genpdf::Alignment::Center)
+            .styled(genpdf::style::Style::new().with_font_size(14))
+    );
+
+    doc.push(
+        Paragraph::new("Staff Information Sheet")
+            .aligned(genpdf::Alignment::Center)
+            .styled(genpdf::style::Style::new().bold().with_font_size(16))
+    );
+
+    doc.push(genpdf::elements::Break::new(2));
+
+    // Personal Information Section
+    doc.push(
+        Paragraph::new("PERSONAL INFORMATION")
+            .styled(genpdf::style::Style::new().bold().with_font_size(14))
+    );
+
+    let personal_info = vec![
+        ("Appointment Number", &staff.appointment_number),
+        ("Full Name", &staff.full_name),
+        ("Gender", &staff.gender),
+        ("Date of Birth", &staff.date_of_birth),
+        ("Age", &format!("{} years", staff.age)),
+        ("NIC Number", &staff.nic_number),
+        ("Marital Status", &staff.marital_status),
+        ("Contact Number", staff.contact_number.as_deref().unwrap_or("N/A")),
+        ("Email", staff.email.as_deref().unwrap_or("N/A")),
+    ];
+
+    for (label, value) in personal_info {
+        doc.push(
+            Paragraph::new(format!("{}: {}", label, value))
+                .styled(genpdf::style::Style::new().with_font_size(11))
+        );
+    }
+
+    // Address
+    let mut address = String::new();
+    if let Some(line1) = &staff.address_line1 {
+        if !line1.is_empty() { address.push_str(line1); }
+    }
+    if let Some(line2) = &staff.address_line2 {
+        if !line2.is_empty() {
+            if !address.is_empty() { address.push_str(", "); }
+            address.push_str(line2);
+        }
+    }
+    if let Some(line3) = &staff.address_line3 {
+        if !line3.is_empty() {
+            if !address.is_empty() { address.push_str(", "); }
+            address.push_str(line3);
+        }
+    }
+    if address.is_empty() { address = "Not provided".to_string(); }
+
+    doc.push(
+        Paragraph::new(format!("Address: {}", address))
+            .styled(genpdf::style::Style::new().with_font_size(11))
+    );
+
+    doc.push(genpdf::elements::Break::new(1));
+
+    // Employment Details Section
+    doc.push(
+        Paragraph::new("EMPLOYMENT DETAILS")
+            .styled(genpdf::style::Style::new().bold().with_font_size(14))
+    );
+
+    let employment_info = vec![
+        ("Designation", &staff.designation),
+        ("Date of First Appointment", &staff.date_of_first_appointment),
+        ("Date of Retirement", &staff.date_of_retirement),
+        ("Increment Date", staff.increment_date.as_deref().unwrap_or("N/A")),
+    ];
+
+    for (label, value) in employment_info {
+        doc.push(
+            Paragraph::new(format!("{}: {}", label, value))
+                .styled(genpdf::style::Style::new().with_font_size(11))
+        );
+    }
+
+    doc.push(genpdf::elements::Break::new(1));
+
+    // Salary Information Section
+    doc.push(
+        Paragraph::new("SALARY INFORMATION")
+            .styled(genpdf::style::Style::new().bold().with_font_size(14))
+    );
+
+    doc.push(
+        Paragraph::new(format!("Salary Code: {}", staff.salary_code))
+            .styled(genpdf::style::Style::new().with_font_size(11))
+    );
+
+    doc.push(
+        Paragraph::new(format!("Basic Salary: Rs. {:.2}", staff.basic_salary))
+            .styled(genpdf::style::Style::new().with_font_size(11))
+    );
+
+    doc.push(
+        Paragraph::new(format!("Increment Amount: Rs. {:.2}", staff.increment_amount))
+            .styled(genpdf::style::Style::new().with_font_size(11))
+    );
+
+    doc.push(
+        Paragraph::new(format!("Total Salary: Rs. {:.2}", staff.basic_salary + staff.increment_amount))
+            .styled(genpdf::style::Style::new().bold().with_font_size(12))
+    );
+
+    // Generate PDF
+    let mut buf = Vec::new();
+    doc.render(&mut buf).map_err(|e| format!("Failed to generate PDF: {}", e))?;
+
+    Ok(buf)
+}
+
+fn generate_bulk_pdf(staff_list: &[Staff]) -> Result<Vec<u8>, String> {
+    // Create a new PDF document
+    let font_family = fonts::from_files("./fonts", "DejaVuSans", None)
+        .unwrap_or_else(|_| fonts::builtin::HELVETICA);
+
+    let mut doc = Document::new(font_family);
+    doc.set_title("Staff Directory");
+    doc.set_minimal_conformance();
+    doc.set_line_spacing(1.25);
+
+    // Header
+    doc.push(
+        Paragraph::new("Divisional Forest Office")
+            .aligned(genpdf::Alignment::Center)
+            .styled(genpdf::style::Style::new().bold().with_font_size(18))
+    );
+
+    doc.push(
+        Paragraph::new("Vavuniya, Sri Lanka")
+            .aligned(genpdf::Alignment::Center)
+            .styled(genpdf::style::Style::new().with_font_size(12))
+    );
+
+    doc.push(
+        Paragraph::new("Staff Directory")
+            .aligned(genpdf::Alignment::Center)
+            .styled(genpdf::style::Style::new().bold().with_font_size(14))
+    );
+
+    doc.push(
+        Paragraph::new(format!("Total Staff: {} | Generated: {}",
+                              staff_list.len(),
+                              chrono::Utc::now().format("%Y-%m-%d")))
+            .aligned(genpdf::Alignment::Right)
+            .styled(genpdf::style::Style::new().with_font_size(10))
+    );
+
+    doc.push(genpdf::elements::Break::new(2));
+
+    // Create table
+    let mut table = TableLayout::new(vec![1, 2, 3, 2, 1, 2, 2, 1, 2]);
+    table.set_cell_decorator(genpdf::elements::FrameCellDecorator::new(true, true, false));
+
+    // Table headers
+    table.row().element(Paragraph::new("#").styled(genpdf::style::Style::new().bold()));
+    table.row().element(Paragraph::new("Appointment No.").styled(genpdf::style::Style::new().bold()));
+    table.row().element(Paragraph::new("Full Name").styled(genpdf::style::Style::new().bold()));
+    table.row().element(Paragraph::new("Designation").styled(genpdf::style::Style::new().bold()));
+    table.row().element(Paragraph::new("Age").styled(genpdf::style::Style::new().bold()));
+    table.row().element(Paragraph::new("NIC Number").styled(genpdf::style::Style::new().bold()));
+    table.row().element(Paragraph::new("Contact").styled(genpdf::style::Style::new().bold()));
+    table.row().element(Paragraph::new("Salary Code").styled(genpdf::style::Style::new().bold()));
+    table.row().element(Paragraph::new("Basic Salary").styled(genpdf::style::Style::new().bold()));
+
+    // Add staff data
     for (index, staff) in staff_list.iter().enumerate() {
-        table_rows.push_str(&format!(
-            r#"
-            <tr class="{}">
-                <td>{}</td>
-                <td>{}</td>
-                <td>{}</td>
-                <td>{}</td>
-                <td>{}</td>
-                <td>{}</td>
-                <td>{}</td>
-                <td>{}</td>
-                <td>Rs. {:.2}</td>
-            </tr>
-            "#,
-            if index % 2 == 0 { "even-row" } else { "odd-row" },
-            index + 1,
-            staff.appointment_number,
-            staff.full_name,
-            staff.designation,
-            staff.age,
-            staff.nic_number,
-            staff.contact_number.as_deref().unwrap_or("N/A"),
-            staff.salary_code,
-            staff.basic_salary
-        ));
+        table.row().element(Paragraph::new((index + 1).to_string()));
+        table.row().element(Paragraph::new(&staff.appointment_number));
+        table.row().element(Paragraph::new(&staff.full_name));
+        table.row().element(Paragraph::new(&staff.designation));
+        table.row().element(Paragraph::new(staff.age.to_string()));
+        table.row().element(Paragraph::new(&staff.nic_number));
+        table.row().element(Paragraph::new(staff.contact_number.as_deref().unwrap_or("N/A")));
+        table.row().element(Paragraph::new(&staff.salary_code));
+        table.row().element(Paragraph::new(format!("Rs. {:.0}", staff.basic_salary)));
     }
 
-    format!(
-        r#"
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>Staff Directory</title>
-            <style>
-                @page {{ margin: 15px; size: A4 landscape; }}
-                body {{ font-family: 'Arial', sans-serif; margin: 0; padding: 10px; color: #333; font-size: 11px; }}
-                .header {{ text-align: center; margin-bottom: 20px; }}
-                .header h1 {{ color: #2c3e50; margin: 0; font-size: 24px; }}
-                .header h2 {{ color: #34495e; margin: 5px 0; font-size: 16px; font-weight: normal; }}
-                table {{ width: 100%; border-collapse: collapse; margin-top: 15px; }}
-                th {{ background: #34495e; color: white; padding: 8px; text-align: left; font-weight: bold; border: 1px solid #2c3e50; }}
-                td {{ padding: 6px 8px; border: 1px solid #bdc3c7; }}
-                .even-row {{ background-color: #f8f9fa; }}
-                .odd-row {{ background-color: white; }}
-                .footer {{ margin-top: 20px; text-align: center; color: #7f8c8d; font-size: 10px; }}
-                .summary {{ margin-bottom: 15px; text-align: right; color: #2c3e50; font-weight: bold; }}
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <h1>Divisional Forest Office</h1>
-                <h2>Vavuniya, Sri Lanka</h2>
-                <h2>Staff Directory</h2>
-            </div>
+    doc.push(table);
 
-            <div class="summary">
-                Total Staff: {} | Generated on {}
-            </div>
+    // Generate PDF
+    let mut buf = Vec::new();
+    doc.render(&mut buf).map_err(|e| format!("Failed to generate PDF: {}", e))?;
 
-            <table>
-                <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Appointment No.</th>
-                        <th>Full Name</th>
-                        <th>Designation</th>
-                        <th>Age</th>
-                        <th>NIC Number</th>
-                        <th>Contact</th>
-                        <th>Salary Code</th>
-                        <th>Basic Salary</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {}
-                </tbody>
-            </table>
-
-            <div class="footer">
-                Divisional Forest Office - Vavuniya, Sri Lanka
-            </div>
-        </body>
-        </html>
-        "#,
-        staff_list.len(),
-        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"),
-        table_rows
-    )
+    Ok(buf)
 }

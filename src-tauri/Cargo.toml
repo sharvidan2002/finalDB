@@ -20,9 +20,6 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.6", features = ["v4", "serde"] }
 base64 = "0.21"
 anyhow = "1.0"
-
-[features]
-# by default Tauri runs in production mode
-default = [ "custom-protocol" ]
-# this feature is used for production builds or when `devPath` points to the filesystem
-custom-protocol = [ "tauri/custom-protocol" ]
+lopdf = "0.32"
+genpdf = "0.2"
+directories = "5.0"
