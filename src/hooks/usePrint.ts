@@ -1,5 +1,8 @@
 import { useMutation } from '@tanstack/react-query';
 import { printService } from '../lib/database';
+import { save } from '@tauri-apps/api/dialog';
+import { writeBinaryFile, writeFile } from '@tauri-apps/api/fs';
+import { downloadDir } from '@tauri-apps/api/path';
 
 // Import html2pdf
 declare global {
@@ -23,28 +26,29 @@ const loadHtml2Pdf = async () => {
   }
 };
 
-// Enhanced PDF export function with automatic PDF generation
-async function exportToPDF(htmlContent: string, filename: string, staffCount: number = 1) {
-  try {
-    // Show loading message
-    const loadingMessage = `Generating PDF for ${staffCount > 1 ? `${staffCount} staff records` : 'staff record'}...`;
+// Show notification function
+function showNotification(message: string, type: 'loading' | 'success' | 'error' = 'loading') {
+  const notification = document.createElement('div');
 
-    // Create a temporary notification (you can style this better)
-    const notification = document.createElement('div');
-    notification.innerHTML = `
-      <div style="
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #3b82f6;
-        color: white;
-        padding: 12px 24px;
-        border-radius: 8px;
-        z-index: 10000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        font-family: system-ui;
-      ">
-        <div style="display: flex; align-items: center; gap: 8px;">
+  const bgColor = type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#3b82f6';
+  const icon = type === 'success' ? '✓' : type === 'error' ? '✗' : '';
+
+  notification.innerHTML = `
+    <div style="
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: ${bgColor};
+      color: white;
+      padding: 12px 24px;
+      border-radius: 8px;
+      z-index: 10000;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+      font-family: system-ui;
+      max-width: 300px;
+    ">
+      <div style="display: flex; align-items: center; gap: 8px;">
+        ${type === 'loading' ? `
           <div style="
             width: 16px;
             height: 16px;
@@ -53,17 +57,42 @@ async function exportToPDF(htmlContent: string, filename: string, staffCount: nu
             border-radius: 50%;
             animation: spin 1s linear infinite;
           "></div>
-          ${loadingMessage}
-        </div>
+        ` : icon}
+        ${message}
       </div>
+    </div>
+    ${type === 'loading' ? `
       <style>
         @keyframes spin {
           to { transform: rotate(360deg); }
         }
       </style>
-    `;
-    document.body.appendChild(notification);
+    ` : ''}
+  `;
 
+  document.body.appendChild(notification);
+
+  // Auto-remove after delay (except for loading notifications)
+  if (type !== 'loading') {
+    const delay = type === 'error' ? 5000 : 3000;
+    setTimeout(() => {
+      if (document.body.contains(notification)) {
+        document.body.removeChild(notification);
+      }
+    }, delay);
+  }
+
+  return notification;
+}
+
+// Enhanced PDF export function with Tauri file system support
+async function exportToPDF(htmlContent: string, filename: string, staffCount: number = 1) {
+  const loadingNotification = showNotification(
+    `Generating PDF for ${staffCount > 1 ? `${staffCount} staff records` : 'staff record'}...`,
+    'loading'
+  );
+
+  try {
     // Ensure html2pdf is loaded
     await loadHtml2Pdf();
 
@@ -96,7 +125,7 @@ async function exportToPDF(htmlContent: string, filename: string, staffCount: nu
       },
       jsPDF: {
         unit: 'mm',
-        format: staffCount > 1 ? 'a4' : 'a4',
+        format: 'a4',
         orientation: staffCount > 1 ? 'landscape' : 'portrait'
       },
       pagebreak: {
@@ -104,132 +133,119 @@ async function exportToPDF(htmlContent: string, filename: string, staffCount: nu
       }
     };
 
-    // Generate PDF (but don't auto-save)
+    // Generate PDF blob
     const pdfBlob = await window.html2pdf()
       .set(options)
       .from(container)
       .outputPdf('blob');
 
-    // For Tauri app, you can use file dialog to let user choose location
-    // Import at top of file: import { save } from '@tauri-apps/api/dialog';
-    // const filePath = await save({
-    //   filters: [{
-    //     name: 'PDF',
-    //     extensions: ['pdf']
-    //   }],
-    //   defaultPath: options.filename
-    // });
-
-    // For now, use browser default download
-    const url = URL.createObjectURL(pdfBlob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = options.filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    // Clean up
+    // Clean up container
     document.body.removeChild(container);
-    document.body.removeChild(notification);
 
-    // Show success message
-    const successNotification = document.createElement('div');
-    successNotification.innerHTML = `
-      <div style="
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #10b981;
-        color: white;
-        padding: 12px 24px;
-        border-radius: 8px;
-        z-index: 10000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        font-family: system-ui;
-      ">
-        ✓ PDF downloaded successfully!
-      </div>
-    `;
-    document.body.appendChild(successNotification);
+    // Remove loading notification
+    if (document.body.contains(loadingNotification)) {
+      document.body.removeChild(loadingNotification);
+    }
 
-    // Remove success notification after 3 seconds
-    setTimeout(() => {
-      if (document.body.contains(successNotification)) {
-        document.body.removeChild(successNotification);
+    // Use Tauri's save dialog to let user choose location
+    try {
+      const filePath = await save({
+        filters: [{
+          name: 'PDF',
+          extensions: ['pdf']
+        }],
+        defaultPath: options.filename
+      });
+
+      if (filePath) {
+        // Convert blob to array buffer
+        const arrayBuffer = await pdfBlob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        // Write the PDF file
+        await writeBinaryFile(filePath, uint8Array);
+
+        showNotification('PDF saved successfully!', 'success');
+        return true;
+      } else {
+        // User cancelled the save dialog
+        showNotification('PDF export cancelled', 'error');
+        return false;
       }
-    }, 3000);
+    } catch (saveError) {
+      console.error('Save dialog error:', saveError);
+
+      // Fallback: Save to downloads directory
+      try {
+        const downloadsPath = await downloadDir();
+        const fallbackPath = `${downloadsPath}/${options.filename}`;
+
+        const arrayBuffer = await pdfBlob.arrayBuffer();
+        const uint8Array = new Uint8Array(arrayBuffer);
+
+        await writeBinaryFile(fallbackPath, uint8Array);
+        showNotification(`PDF saved to Downloads folder as ${options.filename}`, 'success');
+        return true;
+      } catch (fallbackError) {
+        console.error('Fallback save failed:', fallbackError);
+        throw fallbackError;
+      }
+    }
 
   } catch (error) {
     console.error('PDF generation failed:', error);
 
-    // Properly handle error type
+    // Remove loading notification
+    if (document.body.contains(loadingNotification)) {
+      document.body.removeChild(loadingNotification);
+    }
+
     const errorMessage = error instanceof Error ? error.message : String(error);
-
-    // Show error message
-    const errorNotification = document.createElement('div');
-    errorNotification.innerHTML = `
-      <div style="
-        position: fixed;
-        top: 20px;
-        right: 20px;
-        background: #ef4444;
-        color: white;
-        padding: 12px 24px;
-        border-radius: 8px;
-        z-index: 10000;
-        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
-        font-family: system-ui;
-        max-width: 300px;
-      ">
-        ✗ PDF generation failed<br>
-        <small style="opacity: 0.9;">Error: ${errorMessage}</small>
-      </div>
-    `;
-    document.body.appendChild(errorNotification);
-
-    // Remove error notification after 5 seconds
-    setTimeout(() => {
-      if (document.body.contains(errorNotification)) {
-        document.body.removeChild(errorNotification);
-      }
-    }, 5000);
+    showNotification(`PDF generation failed: ${errorMessage}`, 'error');
 
     // Fallback: Save HTML file instead
     try {
-      const { writeBinaryFile } = await import('@tauri-apps/api/fs');
-      const { downloadDir } = await import('@tauri-apps/api/path');
-
       const downloadsPath = await downloadDir();
-      const htmlFilePath = `${downloadsPath}${filename}`;
+      const htmlFilePath = `${downloadsPath}/${filename}`;
       const htmlBytes = new TextEncoder().encode(htmlContent);
-      await writeBinaryFile(htmlFilePath, htmlBytes);
+      await writeFile(htmlFilePath, htmlBytes);
 
+      showNotification('Saved as HTML file instead', 'success');
       console.log('Saved HTML fallback to:', htmlFilePath);
     } catch (fallbackError) {
       console.error('Fallback HTML save also failed:', fallbackError);
+      showNotification('All export methods failed', 'error');
     }
+
+    return false;
   }
 }
 
 export function usePrintIndividual() {
   return useMutation({
     mutationFn: (staffId: string) => printService.printIndividual(staffId),
-    onSuccess: (htmlContent) => {
-      const filename = `staff-details-${new Date().toISOString().split('T')[0]}.html`;
-      exportToPDF(htmlContent, filename, 1);
+    onSuccess: async (htmlContent) => {
+      const filename = `staff-details-${new Date().toISOString().split('T')[0]}.pdf`;
+      await exportToPDF(htmlContent, filename, 1);
     },
+    onError: (error) => {
+      console.error('Print individual failed:', error);
+      showNotification('Failed to generate staff details', 'error');
+    }
   });
 }
 
 export function usePrintBulk() {
   return useMutation({
     mutationFn: (staffIds: string[]) => printService.printBulk(staffIds),
-    onSuccess: (htmlContent, variables) => {
-      const filename = `staff-directory-${new Date().toISOString().split('T')[0]}.html`;
-      exportToPDF(htmlContent, filename, variables.length);
+    onSuccess: async (htmlContent, variables) => {
+      const filename = `staff-directory-${new Date().toISOString().split('T')[0]}.pdf`;
+      await exportToPDF(htmlContent, filename, variables.length);
     },
+    onError: (error) => {
+      console.error('Print bulk failed:', error);
+      showNotification('Failed to generate staff directory', 'error');
+    }
   });
 }
 
@@ -237,12 +253,16 @@ export function useExportToPDF() {
   return useMutation({
     mutationFn: ({ staffIds, isBulk }: { staffIds: string[]; isBulk: boolean }) =>
       printService.exportToPDF(staffIds, isBulk),
-    onSuccess: (htmlContent, variables) => {
+    onSuccess: async (htmlContent, variables) => {
       const filename = variables.isBulk
-        ? `staff-directory-${new Date().toISOString().split('T')[0]}.html`
-        : `staff-details-${new Date().toISOString().split('T')[0]}.html`;
+        ? `staff-directory-${new Date().toISOString().split('T')[0]}.pdf`
+        : `staff-details-${new Date().toISOString().split('T')[0]}.pdf`;
 
-      exportToPDF(htmlContent, filename, variables.staffIds.length);
+      await exportToPDF(htmlContent, filename, variables.staffIds.length);
     },
+    onError: (error) => {
+      console.error('Export to PDF failed:', error);
+      showNotification('Failed to export PDF', 'error');
+    }
   });
 }
