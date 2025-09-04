@@ -1,0 +1,96 @@
+# -----------------------
+# Node / frontend
+# -----------------------
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+# Vite build output
+dist/
+.vite/
+# build / temp
+build/
+out/
+# caches
+.cache/
+.idea/
+.vscode/
+.svelte-kit/
+*.log
+*.tmp
+Cargo.lock
+package-lock.json
+# -----------------------
+# Rust / Tauri
+# -----------------------
+# Rust build artifacts
+/target/
+/**/target/
+# Tauri build output (if present under src-tauri)
+src-tauri/target/
+
+# -----------------------
+# OS files
+# -----------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# -----------------------
+# Environment & secrets
+# -----------------------
+.env
+.env.local
+.env.*.local
+.env.production
+.env.production.local
+.env.development.local
+# If you keep any other env files (like keystore), add them here.
+
+# -----------------------
+# IDEs / Editors
+# -----------------------
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+*.swp
+*.swo
+
+# -----------------------
+# Testing / Coverage
+# -----------------------
+coverage/
+.nyc_output/
+jest-cache/
+.vitest/
+
+# -----------------------
+# Package manager caches / lockhelpers
+# -----------------------
+# (Do not ignore package-lock.json or pnpm-lock.yaml if you want deterministic installs;
+#  remove the line below if you track locks.)
+# pnpm-lock.yaml
+
+# -----------------------
+# Misc
+# -----------------------
+# OS thumbnails, temp files
+*.tmp
+*.bak
+*.old
+
+# -----------------------
+# Optional: generated icons
+# -----------------------
+# The Tauri icon command typically writes icons to src-tauri/icons/.
+# If you want generated icons ignored (keep originals in a separate folder),
+# uncomment the next line:
+# src-tauri/icons/generated-*
+
+# -----------------------
+# Notes
+# -----------------------
+# - Keep tauri.conf.json, Cargo.toml, src-tauri/icons (source icons), and migrations committed.
+# - If you want to ignore the generated src-tauri/icons outputs, adjust the icons line above.

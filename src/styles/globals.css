@@ -1,0 +1,201 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 221.2 83.2% 53.3%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222.2 84% 4.9%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222.2 84% 4.9%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 221.2 83.2% 53.3%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 222.2 84% 4.9%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 224.3 76.3% 94.1%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom styles for the application */
+@layer components {
+  .container {
+    @apply w-full mx-auto px-4 sm:px-6 lg:px-8;
+  }
+
+  /* Form styles */
+  .form-section {
+    @apply bg-white rounded-xl shadow-lg border border-slate-200 p-6 space-y-4;
+  }
+
+  .form-section-title {
+    @apply text-lg font-semibold text-slate-800 pb-2 border-b border-slate-200 mb-4;
+  }
+
+  .field-group {
+    @apply space-y-2;
+  }
+
+  .field-row {
+    @apply grid grid-cols-1 md:grid-cols-2 gap-4;
+  }
+
+  .field-row-triple {
+    @apply grid grid-cols-1 md:grid-cols-3 gap-4;
+  }
+
+  /* Card styles */
+  .staff-card {
+    @apply bg-white rounded-xl shadow-md hover:shadow-lg border border-slate-200 p-6 transition-all duration-300 hover:border-slate-300;
+  }
+
+  .staff-card:hover {
+    @apply transform -translate-y-1;
+  }
+
+  /* Status indicators */
+  .status-active {
+    @apply bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  .status-inactive {
+    @apply bg-red-100 text-red-800 px-2 py-1 rounded-full text-xs font-medium;
+  }
+
+  /* Print styles */
+  @media print {
+    body {
+      @apply text-black bg-white;
+    }
+
+    .no-print {
+      display: none !important;
+    }
+
+    .print-break {
+      page-break-after: always;
+    }
+
+    .print-avoid-break {
+      page-break-inside: avoid;
+    }
+  }
+
+  /* Loading states */
+  .skeleton {
+    @apply animate-pulse bg-slate-200 rounded;
+  }
+
+  .loading-spinner {
+    @apply animate-spin rounded-full border-2 border-slate-300 border-t-primary;
+  }
+
+  /* Custom scrollbar */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    @apply bg-slate-100 rounded;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-slate-300 rounded hover:bg-slate-400;
+  }
+
+  /* Focus styles for accessibility */
+  .focus-ring {
+    @apply focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2;
+  }
+
+  /* Typography */
+  .heading-1 {
+    @apply text-3xl font-bold text-slate-800;
+  }
+
+  .heading-2 {
+    @apply text-2xl font-semibold text-slate-700;
+  }
+
+  .heading-3 {
+    @apply text-xl font-medium text-slate-700;
+  }
+
+  .text-muted {
+    @apply text-slate-600;
+  }
+
+  .text-subtle {
+    @apply text-slate-500;
+  }
+
+  /* Animations */
+  .fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+
+  .slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
