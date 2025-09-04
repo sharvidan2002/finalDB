@@ -213,7 +213,6 @@ export function EditStaffDialog({ isOpen, onClose, staffId, onStaffUpdated }: Ed
               <ImageUpload
                 value={formData.imageData}
                 onChange={(imageData) => handleInputChange('imageData', imageData)}
-                label="Upload Staff Photo"
               />
             </div>
 

@@ -1,15 +1,14 @@
 import { useState, useMemo } from 'react';
-import { Search, Filter, Eye, Edit, Trash2, Users, Printer, Download, Plus } from 'lucide-react';
+import { Search, Filter, Eye, Edit, Trash2, Users, Download, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Checkbox } from '../components/ui/checkbox';
-import { ViewStaffDialog } from '../components/dialogs/ViewStaffDialog';
-import { EditStaffDialog } from '../components/dialogs/EditStaffDialog';
+import { ViewStaffDialog, EditStaffDialog } from '../components/dialogs';
 import { useStaffList } from '../hooks/useStaff';
 import { useDeleteStaff } from '../hooks/useStaffMutations';
-import { usePrintBulk, useExportToPDF } from '../hooks/usePrint';
+import { useExportToPDF } from '../hooks/usePrint';
 import { formatCurrency, debounce } from '../lib/utils';
 import { DESIGNATIONS, SALARY_CODES } from '../types/staff';
 import type { Staff, StaffSearchParams } from '../types/staff';
@@ -24,7 +23,6 @@ export function SearchStaff() {
 
   const { data: allStaff = [], isLoading: isLoadingAll } = useStaffList();
   const deleteStaff = useDeleteStaff();
-  const printBulk = usePrintBulk();
   const exportToPDF = useExportToPDF();
 
   // Filter staff based on search parameters
@@ -47,7 +45,7 @@ export function SearchStaff() {
       filtered = filtered.filter(staff => staff.designation === searchParams.designation);
     }
 
-    // Age range filter - Fixed type issues
+    // Age range filter
     if (searchParams.ageMin !== undefined && searchParams.ageMin !== null) {
       const minAge = typeof searchParams.ageMin === 'string' ? parseInt(searchParams.ageMin) : searchParams.ageMin;
       if (!isNaN(minAge)) {
@@ -79,7 +77,7 @@ export function SearchStaff() {
     return filtered;
   }, [allStaff, searchParams]);
 
-  // Debounced search function - Fixed type issues
+  // Debounced search function
   const debouncedSearch = useMemo(
     () => debounce((field: keyof StaffSearchParams, value: string | number | undefined) => {
       setSearchParams(prev => ({
@@ -93,10 +91,18 @@ export function SearchStaff() {
   const handleSearch = (field: keyof StaffSearchParams, value: string) => {
     if (field === 'ageMin' || field === 'ageMax') {
       const numValue = value === '' ? undefined : parseInt(value);
-      // Only call if we have a valid value or undefined
       if (numValue !== undefined || value === '') {
         debouncedSearch(field, numValue);
       }
+    } else {
+      debouncedSearch(field, value);
+    }
+  };
+
+  // Handle Select changes with special "all" value
+  const handleSelectChange = (field: keyof StaffSearchParams, value: string) => {
+    if (value === 'all') {
+      debouncedSearch(field, undefined);
     } else {
       debouncedSearch(field, value);
     }
@@ -108,7 +114,7 @@ export function SearchStaff() {
   };
 
   const handleSelectAll = () => {
-    if (selectedStaff.size === filteredStaff.length) {
+    if (selectedStaff.size === filteredStaff.length && filteredStaff.length > 0) {
       setSelectedStaff(new Set());
     } else {
       setSelectedStaff(new Set(filteredStaff.map(staff => staff.id)));
@@ -148,12 +154,6 @@ export function SearchStaff() {
     }
   };
 
-  const handleBulkPrint = () => {
-    if (selectedStaff.size > 0) {
-      printBulk.mutate(Array.from(selectedStaff));
-    }
-  };
-
   const handleBulkExport = () => {
     if (selectedStaff.size > 0) {
       exportToPDF.mutate({
@@ -164,7 +164,6 @@ export function SearchStaff() {
   };
 
   const handleStaffUpdated = () => {
-    // This will trigger a refetch through react-query
     setEditDialog({ open: false, staffId: null });
   };
 
@@ -218,14 +217,14 @@ export function SearchStaff() {
                 Designation
               </label>
               <Select
-                value={searchParams.designation || ''}
-                onValueChange={(value) => handleSearch('designation', value)}
+                value={searchParams.designation || 'all'}
+                onValueChange={(value) => handleSelectChange('designation', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select designation" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Designations</SelectItem>
+                  <SelectItem value="all">All Designations</SelectItem>
                   {DESIGNATIONS.map((designation) => (
                     <SelectItem key={designation} value={designation}>
                       {designation}
@@ -260,14 +259,14 @@ export function SearchStaff() {
                 Salary Code
               </label>
               <Select
-                value={searchParams.salaryCode || ''}
-                onValueChange={(value) => handleSearch('salaryCode', value)}
+                value={searchParams.salaryCode || 'all'}
+                onValueChange={(value) => handleSelectChange('salaryCode', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select salary code" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">All Codes</SelectItem>
+                  <SelectItem value="all">All Codes</SelectItem>
                   {SALARY_CODES.map((code) => (
                     <SelectItem key={code} value={code}>
                       {code}
@@ -291,20 +290,13 @@ export function SearchStaff() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={handleBulkPrint}
-                disabled={printBulk.isPending}
-                className="flex items-center space-x-2"
-              >
-                <Printer className="h-4 w-4" />
-                <span>Print Selected</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
                 onClick={handleBulkExport}
                 disabled={exportToPDF.isPending}
                 className="flex items-center space-x-2"
               >
+                {exportToPDF.isPending && (
+                  <div className="w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />
+                )}
                 <Download className="h-4 w-4" />
                 <span>Export Selected</span>
               </Button>
