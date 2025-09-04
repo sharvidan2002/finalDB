@@ -1,4 +1,4 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
@@ -20,7 +20,8 @@
         justify-content: center;
         color: white;
         z-index: 9999;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          sans-serif;
       }
 
       .loading-logo {
@@ -59,8 +60,12 @@
       }
 
       @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
       }
 
       .loading-text {
@@ -81,8 +86,17 @@
     <!-- Loading Screen -->
     <div class="loading-screen" id="loading-screen">
       <div class="loading-logo">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2L13.5 8.5L20 7L14.5 12L20 17L13.5 15.5L12 22L10.5 15.5L4 17L9.5 12L4 7L10.5 8.5L12 2Z" fill="white"/>
+        <svg
+          width="40"
+          height="40"
+          viewBox="0 0 24 24"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+        >
+          <path
+            d="M12 2L13.5 8.5L20 7L14.5 12L20 17L13.5 15.5L12 22L10.5 15.5L4 17L9.5 12L4 7L10.5 8.5L12 2Z"
+            fill="white"
+          />
         </svg>
       </div>
       <h1 class="loading-title">Forest Office</h1>
@@ -98,11 +112,11 @@
 
     <script>
       // Hide loading screen when app is fully loaded
-      window.addEventListener('load', () => {
+      window.addEventListener("load", () => {
         setTimeout(() => {
-          document.body.classList.add('app-loaded');
+          document.body.classList.add("app-loaded");
           setTimeout(() => {
-            const loadingScreen = document.getElementById('loading-screen');
+            const loadingScreen = document.getElementById("loading-screen");
             if (loadingScreen) {
               loadingScreen.remove();
             }
@@ -110,5 +124,7 @@
         }, 1000);
       });
     </script>
+    <!-- Add this before the closing </body> tag -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
   </body>
 </html>

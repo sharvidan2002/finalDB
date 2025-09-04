@@ -198,4 +198,44 @@
       transform: translateY(0);
     }
   }
+  /* Add to your globals.css */
+  .pdf-notification {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    padding: 12px 24px;
+    border-radius: 8px;
+    color: white;
+    font-family: system-ui;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    transition: all 0.3s ease;
+  }
+
+  .pdf-notification.loading {
+    background: #3b82f6;
+  }
+
+  .pdf-notification.success {
+    background: #10b981;
+  }
+
+  .pdf-notification.error {
+    background: #ef4444;
+  }
+
+  @keyframes pdf-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .pdf-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid white;
+    border-top-color: transparent;
+    border-radius: 50%;
+    animation: pdf-spin 1s linear infinite;
+  }
 }
