@@ -1,30 +1,5 @@
 import { useMutation } from '@tanstack/react-query';
-import { printService } from '../lib/database';
-import { save } from '@tauri-apps/api/dialog';
-import { writeBinaryFile, writeFile } from '@tauri-apps/api/fs';
-import { downloadDir } from '@tauri-apps/api/path';
-
-// Import html2pdf
-declare global {
-  interface Window {
-    html2pdf: any;
-  }
-}
-
-// Load html2pdf dynamically
-const loadHtml2Pdf = async () => {
-  if (!window.html2pdf) {
-    const script = document.createElement('script');
-    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js';
-    script.async = true;
-    document.head.appendChild(script);
-
-    return new Promise((resolve, reject) => {
-      script.onload = resolve;
-      script.onerror = reject;
-    });
-  }
-};
+import { invoke } from '@tauri-apps/api/tauri';
 
 // Show notification function
 function showNotification(message: string, type: 'loading' | 'success' | 'error' = 'loading') {
@@ -45,7 +20,7 @@ function showNotification(message: string, type: 'loading' | 'success' | 'error'
       z-index: 10000;
       box-shadow: 0 4px 12px rgba(0,0,0,0.15);
       font-family: system-ui;
-      max-width: 300px;
+      max-width: 400px;
     ">
       <div style="display: flex; align-items: center; gap: 8px;">
         ${type === 'loading' ? `
@@ -85,184 +60,123 @@ function showNotification(message: string, type: 'loading' | 'success' | 'error'
   return notification;
 }
 
-// Enhanced PDF export function with Tauri file system support
-async function exportToPDF(htmlContent: string, filename: string, staffCount: number = 1) {
-  const loadingNotification = showNotification(
-    `Generating PDF for ${staffCount > 1 ? `${staffCount} staff records` : 'staff record'}...`,
-    'loading'
-  );
-
-  try {
-    // Ensure html2pdf is loaded
-    await loadHtml2Pdf();
-
-    // Wait a moment for the script to be ready
-    await new Promise(resolve => setTimeout(resolve, 500));
-
-    // Create a temporary container
-    const container = document.createElement('div');
-    container.innerHTML = htmlContent;
-    container.style.position = 'absolute';
-    container.style.left = '-9999px';
-    container.style.top = '-9999px';
-    container.style.width = '210mm'; // A4 width
-    document.body.appendChild(container);
-
-    // PDF generation options
-    const options = {
-      margin: [10, 10, 10, 10], // top, right, bottom, left in mm
-      filename: filename.replace('.html', '.pdf'),
-      image: {
-        type: 'jpeg',
-        quality: 0.95
-      },
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        letterRendering: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff'
-      },
-      jsPDF: {
-        unit: 'mm',
-        format: 'a4',
-        orientation: staffCount > 1 ? 'landscape' : 'portrait'
-      },
-      pagebreak: {
-        mode: ['avoid-all', 'css', 'legacy']
-      }
-    };
-
-    // Generate PDF blob
-    const pdfBlob = await window.html2pdf()
-      .set(options)
-      .from(container)
-      .outputPdf('blob');
-
-    // Clean up container
-    document.body.removeChild(container);
-
-    // Remove loading notification
-    if (document.body.contains(loadingNotification)) {
-      document.body.removeChild(loadingNotification);
-    }
-
-    // Use Tauri's save dialog to let user choose location
-    try {
-      const filePath = await save({
-        filters: [{
-          name: 'PDF',
-          extensions: ['pdf']
-        }],
-        defaultPath: options.filename
-      });
-
-      if (filePath) {
-        // Convert blob to array buffer
-        const arrayBuffer = await pdfBlob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-
-        // Write the PDF file
-        await writeBinaryFile(filePath, uint8Array);
-
-        showNotification('PDF saved successfully!', 'success');
-        return true;
-      } else {
-        // User cancelled the save dialog
-        showNotification('PDF export cancelled', 'error');
-        return false;
-      }
-    } catch (saveError) {
-      console.error('Save dialog error:', saveError);
-
-      // Fallback: Save to downloads directory
-      try {
-        const downloadsPath = await downloadDir();
-        const fallbackPath = `${downloadsPath}/${options.filename}`;
-
-        const arrayBuffer = await pdfBlob.arrayBuffer();
-        const uint8Array = new Uint8Array(arrayBuffer);
-
-        await writeBinaryFile(fallbackPath, uint8Array);
-        showNotification(`PDF saved to Downloads folder as ${options.filename}`, 'success');
-        return true;
-      } catch (fallbackError) {
-        console.error('Fallback save failed:', fallbackError);
-        throw fallbackError;
-      }
-    }
-
-  } catch (error) {
-    console.error('PDF generation failed:', error);
-
-    // Remove loading notification
-    if (document.body.contains(loadingNotification)) {
-      document.body.removeChild(loadingNotification);
-    }
-
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    showNotification(`PDF generation failed: ${errorMessage}`, 'error');
-
-    // Fallback: Save HTML file instead
-    try {
-      const downloadsPath = await downloadDir();
-      const htmlFilePath = `${downloadsPath}/${filename}`;
-      const htmlBytes = new TextEncoder().encode(htmlContent);
-      await writeFile(htmlFilePath, htmlBytes);
-
-      showNotification('Saved as HTML file instead', 'success');
-      console.log('Saved HTML fallback to:', htmlFilePath);
-    } catch (fallbackError) {
-      console.error('Fallback HTML save also failed:', fallbackError);
-      showNotification('All export methods failed', 'error');
-    }
-
-    return false;
+// Remove notification function
+function removeNotification(notification: HTMLElement) {
+  if (document.body.contains(notification)) {
+    document.body.removeChild(notification);
   }
 }
 
 export function usePrintIndividual() {
   return useMutation({
-    mutationFn: (staffId: string) => printService.printIndividual(staffId),
-    onSuccess: async (htmlContent) => {
-      const filename = `staff-details-${new Date().toISOString().split('T')[0]}.pdf`;
-      await exportToPDF(htmlContent, filename, 1);
+    mutationFn: async (staffId: string) => {
+      const loadingNotification = showNotification('Generating PDF for staff record...', 'loading');
+
+      try {
+        const result = await invoke<string>('generate_staff_pdf', { staffId });
+        removeNotification(loadingNotification);
+
+        // Show success message with option to open Downloads folder
+        showNotification('PDF saved to Downloads folder! Click "Open Downloads" to view.', 'success');
+
+        return result;
+      } catch (error) {
+        removeNotification(loadingNotification);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        showNotification(`Failed to generate PDF: ${errorMessage}`, 'error');
+        throw error;
+      }
     },
     onError: (error) => {
       console.error('Print individual failed:', error);
-      showNotification('Failed to generate staff details', 'error');
     }
   });
 }
 
 export function usePrintBulk() {
   return useMutation({
-    mutationFn: (staffIds: string[]) => printService.printBulk(staffIds),
-    onSuccess: async (htmlContent, variables) => {
-      const filename = `staff-directory-${new Date().toISOString().split('T')[0]}.pdf`;
-      await exportToPDF(htmlContent, filename, variables.length);
+    mutationFn: async (staffIds: string[]) => {
+      const loadingNotification = showNotification(
+        `Generating PDF for ${staffIds.length} staff records...`,
+        'loading'
+      );
+
+      try {
+        const result = await invoke<string>('generate_bulk_staff_pdf', { staffIds });
+        removeNotification(loadingNotification);
+
+        // Show success message with option to open Downloads folder
+        showNotification('Staff directory PDF saved to Downloads! Click "Open Downloads" to view.', 'success');
+
+        return result;
+      } catch (error) {
+        removeNotification(loadingNotification);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        showNotification(`Failed to generate PDF: ${errorMessage}`, 'error');
+        throw error;
+      }
     },
     onError: (error) => {
       console.error('Print bulk failed:', error);
-      showNotification('Failed to generate staff directory', 'error');
     }
   });
 }
 
 export function useExportToPDF() {
   return useMutation({
-    mutationFn: ({ staffIds, isBulk }: { staffIds: string[]; isBulk: boolean }) =>
-      printService.exportToPDF(staffIds, isBulk),
-    onSuccess: async (htmlContent, variables) => {
-      const filename = variables.isBulk
-        ? `staff-directory-${new Date().toISOString().split('T')[0]}.pdf`
-        : `staff-details-${new Date().toISOString().split('T')[0]}.pdf`;
+    mutationFn: async ({ staffIds, isBulk }: { staffIds: string[]; isBulk: boolean }) => {
+      const isMultiple = isBulk || staffIds.length > 1;
+      const loadingNotification = showNotification(
+        `Generating PDF for ${isMultiple ? `${staffIds.length} staff records` : 'staff record'}...`,
+        'loading'
+      );
 
-      await exportToPDF(htmlContent, filename, variables.staffIds.length);
+      try {
+        const result = await invoke<string>('export_staff_pdf', {
+          staffIds,
+          isBulk: isMultiple
+        });
+        removeNotification(loadingNotification);
+
+        // Show success message
+        const message = isMultiple
+          ? 'Staff directory PDF saved to Downloads! Click "Open Downloads" to view.'
+          : 'Staff details PDF saved to Downloads! Click "Open Downloads" to view.';
+
+        showNotification(message, 'success');
+
+        return result;
+      } catch (error) {
+        removeNotification(loadingNotification);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        showNotification(`Failed to generate PDF: ${errorMessage}`, 'error');
+        throw error;
+      }
     },
     onError: (error) => {
       console.error('Export to PDF failed:', error);
-      showNotification('Failed to export PDF', 'error');
     }
   });
+}
+
+// Helper function to open Downloads folder
+export function useOpenDownloadsFolder() {
+  return useMutation({
+    mutationFn: async () => {
+      try {
+        const result = await invoke<string>('open_downloads_folder');
+        showNotification('Downloads folder opened!', 'success');
+        return result;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        showNotification(`Could not open Downloads folder: ${errorMessage}`, 'error');
+        throw error;
+      }
+    }
+  });
+}
+
+// Legacy function names for backward compatibility
+export function usePrintDirect() {
+  return useExportToPDF();
 }
