@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { printService } from '../lib/database';
-import { printContent, downloadContent } from '../lib/utils';
+import { printContent } from '../lib/utils';
 
 export function usePrintIndividual() {
   return useMutation({
@@ -24,12 +24,9 @@ export function useExportToPDF() {
   return useMutation({
     mutationFn: ({ staffIds, isBulk }: { staffIds: string[]; isBulk: boolean }) =>
       printService.exportToPDF(staffIds, isBulk),
-    onSuccess: (htmlContent, variables) => {
-      const filename = variables.isBulk
-        ? `staff-directory-${new Date().toISOString().split('T')[0]}.html`
-        : `staff-details-${new Date().toISOString().split('T')[0]}.html`;
-
-      downloadContent(htmlContent, filename);
+    onSuccess: (htmlContent) => {
+      // Open in new window and trigger print dialog for PDF export
+      printContent(htmlContent);
     },
   });
 }

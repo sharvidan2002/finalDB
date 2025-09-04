@@ -1,38 +1,20 @@
 import { useState } from 'react';
-import { Users, UserPlus, Search, Eye } from 'lucide-react';
+import { Users, UserPlus, Search } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { AddStaff } from './AddStaff';
 import { SearchStaff } from './SearchStaff';
-import { ViewStaff } from './ViewStaff';
 import { useStaffList } from '../hooks/useStaff';
 
 export function Dashboard() {
   const [activeTab, setActiveTab] = useState('search');
-  const [selectedStaffId, setSelectedStaffId] = useState<string | undefined>();
   const { data: staffList = [], isLoading } = useStaffList();
-
-  const handleViewStaff = (staffId: string) => {
-    setSelectedStaffId(staffId);
-    setActiveTab('view');
-  };
-
-  const handleEditStaff = (staffId: string) => {
-    setSelectedStaffId(staffId);
-    setActiveTab('add');
-  };
 
   const handleStaffCreated = () => {
     setActiveTab('search');
-    setSelectedStaffId(undefined);
-  };
-
-  const handleStaffUpdated = () => {
-    setActiveTab('view');
   };
 
   const handleBackToSearch = () => {
     setActiveTab('search');
-    setSelectedStaffId(undefined);
   };
 
   return (
@@ -93,45 +75,26 @@ export function Dashboard() {
       {/* Main Tabs */}
       <div className="bg-white rounded-xl shadow-lg border border-slate-200 p-6">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8">
+          <TabsList className="grid w-full grid-cols-2 mb-8">
             <TabsTrigger value="search" className="flex items-center space-x-2">
               <Search className="h-4 w-4" />
               <span>Search Staff</span>
             </TabsTrigger>
             <TabsTrigger value="add" className="flex items-center space-x-2">
               <UserPlus className="h-4 w-4" />
-              <span>Add/Edit Staff</span>
-            </TabsTrigger>
-            <TabsTrigger value="view" className="flex items-center space-x-2" disabled={!selectedStaffId}>
-              <Eye className="h-4 w-4" />
-              <span>View Staff</span>
+              <span>Add Staff</span>
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="search" className="space-y-6">
-            <SearchStaff
-              onViewStaff={handleViewStaff}
-              onEditStaff={handleEditStaff}
-            />
+            <SearchStaff />
           </TabsContent>
 
           <TabsContent value="add" className="space-y-6">
             <AddStaff
-              staffId={selectedStaffId}
               onStaffCreated={handleStaffCreated}
-              onStaffUpdated={handleStaffUpdated}
               onCancel={handleBackToSearch}
             />
-          </TabsContent>
-
-          <TabsContent value="view" className="space-y-6">
-            {selectedStaffId && (
-              <ViewStaff
-                staffId={selectedStaffId}
-                onEdit={() => handleEditStaff(selectedStaffId)}
-                onBack={handleBackToSearch}
-              />
-            )}
           </TabsContent>
         </Tabs>
       </div>

@@ -7,24 +7,18 @@ import { Checkbox } from '../components/ui/checkbox';
 import { DatePicker } from '../components/forms/DatePicker';
 import { NICInput } from '../components/forms/NICInput';
 import { ImageUpload } from '../components/forms/ImageUpload';
-import { useStaffById } from '../hooks/useStaff';
-import { useCreateStaff, useUpdateStaff } from '../hooks/useStaffMutations';
+import { useCreateStaff } from '../hooks/useStaffMutations';
 import { calculateAge, calculateRetirementDate } from '../lib/nicConverter';
 import { DESIGNATIONS, SALARY_CODES, MARITAL_STATUSES, FORM_DEFAULTS } from '../types/staff';
-import type { CreateStaffRequest, UpdateStaffRequest } from '../types/staff';
+import type { CreateStaffRequest } from '../types/staff';
 
 interface AddStaffProps {
-  staffId?: string;
   onStaffCreated: () => void;
-  onStaffUpdated: () => void;
   onCancel: () => void;
 }
 
-export function AddStaff({ staffId, onStaffCreated, onStaffUpdated, onCancel }: AddStaffProps) {
-  const isEditing = !!staffId;
-  const { data: existingStaff, isLoading: isLoadingStaff } = useStaffById(staffId);
+export function AddStaff({ onStaffCreated, onCancel }: AddStaffProps) {
   const createStaff = useCreateStaff();
-  const updateStaff = useUpdateStaff();
 
   const [formData, setFormData] = useState<CreateStaffRequest>({
     appointmentNumber: '',
@@ -51,36 +45,6 @@ export function AddStaff({ staffId, onStaffCreated, onStaffUpdated, onCancel }: 
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [, setNicData] = useState<{ newFormat: string; oldFormat?: string }>({ newFormat: '' });
-
-  // Load existing staff data when editing
-  useEffect(() => {
-    if (existingStaff && isEditing) {
-      setFormData({
-        appointmentNumber: existingStaff.appointmentNumber,
-        fullName: existingStaff.fullName,
-        gender: existingStaff.gender,
-        dateOfBirth: existingStaff.dateOfBirth,
-        age: existingStaff.age,
-        nicNumber: existingStaff.nicNumber,
-        nicNumberOld: existingStaff.nicNumberOld,
-        maritalStatus: existingStaff.maritalStatus,
-        addressLine1: existingStaff.addressLine1 || '',
-        addressLine2: existingStaff.addressLine2 || '',
-        addressLine3: existingStaff.addressLine3 || '',
-        contactNumber: existingStaff.contactNumber || '',
-        email: existingStaff.email || '',
-        designation: existingStaff.designation,
-        dateOfFirstAppointment: existingStaff.dateOfFirstAppointment,
-        dateOfRetirement: existingStaff.dateOfRetirement,
-        incrementDate: existingStaff.incrementDate || '',
-        salaryCode: existingStaff.salaryCode,
-        basicSalary: existingStaff.basicSalary,
-        incrementAmount: existingStaff.incrementAmount,
-        imageData: existingStaff.imageData,
-      });
-    }
-  }, [existingStaff, isEditing]);
 
   // Auto-calculate age and retirement date when date of birth changes
   useEffect(() => {
@@ -106,7 +70,6 @@ export function AddStaff({ staffId, onStaffCreated, onStaffUpdated, onCancel }: 
   };
 
   const handleNICChange = (data: { newFormat: string; oldFormat?: string }) => {
-    setNicData(data);
     handleInputChange('nicNumber', data.newFormat);
     handleInputChange('nicNumberOld', data.oldFormat);
   };
@@ -121,6 +84,19 @@ export function AddStaff({ staffId, onStaffCreated, onStaffUpdated, onCancel }: 
       formatted = formatted.slice(0, 5);
     }
     handleInputChange('incrementDate', formatted);
+  };
+
+  // Handle currency input focus (clear default 0)
+  const handleCurrencyFocus = (field: 'basicSalary' | 'incrementAmount') => {
+    if (formData[field] === 0) {
+      handleInputChange(field, '');
+    }
+  };
+
+  // Handle currency input blur (set to 0 if empty)
+  const handleCurrencyBlur = (field: 'basicSalary' | 'incrementAmount', value: string) => {
+    const numValue = parseFloat(value) || 0;
+    handleInputChange(field, numValue);
   };
 
   const validateForm = (): boolean => {
@@ -165,29 +141,15 @@ export function AddStaff({ staffId, onStaffCreated, onStaffUpdated, onCancel }: 
     }
 
     try {
-      if (isEditing && staffId) {
-        const updateData: UpdateStaffRequest = { ...formData, id: staffId };
-        await updateStaff.mutateAsync(updateData);
-        onStaffUpdated();
-      } else {
-        await createStaff.mutateAsync(formData);
-        onStaffCreated();
-      }
+      await createStaff.mutateAsync(formData);
+      onStaffCreated();
     } catch (error) {
       console.error('Error saving staff:', error);
       setErrors({ submit: 'Failed to save staff record. Please try again.' });
     }
   };
 
-  const isPending = createStaff.isPending || updateStaff.isPending;
-
-  if (isEditing && isLoadingStaff) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="loading-spinner w-8 h-8"></div>
-      </div>
-    );
-  }
+  const isPending = createStaff.isPending;
 
   return (
     <div className="space-y-6">
@@ -204,9 +166,7 @@ export function AddStaff({ staffId, onStaffCreated, onStaffUpdated, onCancel }: 
             <ArrowLeft className="h-4 w-4" />
             <span>Back</span>
           </Button>
-          <h2 className="heading-2">
-            {isEditing ? 'Edit Staff' : 'Add New Staff'}
-          </h2>
+          <h2 className="heading-2">Add New Staff</h2>
         </div>
 
         <Button
@@ -217,7 +177,7 @@ export function AddStaff({ staffId, onStaffCreated, onStaffUpdated, onCancel }: 
         >
           {isPending && <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />}
           <Save className="h-4 w-4" />
-          <span>{isEditing ? 'Update Staff' : 'Save Staff'}</span>
+          <span>Save Staff</span>
         </Button>
       </div>
 
@@ -527,8 +487,10 @@ export function AddStaff({ staffId, onStaffCreated, onStaffUpdated, onCancel }: 
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.basicSalary}
-                  onChange={(e) => handleInputChange('basicSalary', parseFloat(e.target.value) || 0)}
+                  value={formData.basicSalary === 0 ? '' : formData.basicSalary}
+                  onFocus={() => handleCurrencyFocus('basicSalary')}
+                  onBlur={(e) => handleCurrencyBlur('basicSalary', e.target.value)}
+                  onChange={(e) => handleInputChange('basicSalary', e.target.value)}
                   placeholder="Enter basic salary"
                   className={errors.basicSalary ? 'border-red-500' : ''}
                 />
@@ -545,8 +507,10 @@ export function AddStaff({ staffId, onStaffCreated, onStaffUpdated, onCancel }: 
                   type="number"
                   min="0"
                   step="0.01"
-                  value={formData.incrementAmount}
-                  onChange={(e) => handleInputChange('incrementAmount', parseFloat(e.target.value) || 0)}
+                  value={formData.incrementAmount === 0 ? '' : formData.incrementAmount}
+                  onFocus={() => handleCurrencyFocus('incrementAmount')}
+                  onBlur={(e) => handleCurrencyBlur('incrementAmount', e.target.value)}
+                  onChange={(e) => handleInputChange('incrementAmount', e.target.value)}
                   placeholder="Enter increment amount"
                   className={errors.incrementAmount ? 'border-red-500' : ''}
                 />

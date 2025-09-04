@@ -5,47 +5,101 @@ import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Checkbox } from '../components/ui/checkbox';
-import { useStaffList, useStaffSearch } from '../hooks/useStaff';
+import { ViewStaffDialog } from '../components/dialogs/ViewStaffDialog';
+import { EditStaffDialog } from '../components/dialogs/EditStaffDialog';
+import { useStaffList } from '../hooks/useStaff';
 import { useDeleteStaff } from '../hooks/useStaffMutations';
 import { usePrintBulk, useExportToPDF } from '../hooks/usePrint';
 import { formatCurrency, debounce } from '../lib/utils';
 import { DESIGNATIONS, SALARY_CODES } from '../types/staff';
 import type { Staff, StaffSearchParams } from '../types/staff';
 
-interface SearchStaffProps {
-  onViewStaff: (staffId: string) => void;
-  onEditStaff: (staffId: string) => void;
-}
-
-export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
+export function SearchStaff() {
   const [searchParams, setSearchParams] = useState<StaffSearchParams>({});
   const [selectedStaff, setSelectedStaff] = useState<Set<string>>(new Set());
   const [showFilters, setShowFilters] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; staff?: Staff }>({ open: false });
+  const [viewDialog, setViewDialog] = useState<{ open: boolean; staffId: string | null }>({ open: false, staffId: null });
+  const [editDialog, setEditDialog] = useState<{ open: boolean; staffId: string | null }>({ open: false, staffId: null });
 
   const { data: allStaff = [], isLoading: isLoadingAll } = useStaffList();
-  const { data: searchResults = [], isLoading: isSearching } = useStaffSearch(searchParams);
   const deleteStaff = useDeleteStaff();
   const printBulk = usePrintBulk();
   const exportToPDF = useExportToPDF();
 
-  // Debounced search function
+  // Filter staff based on search parameters
+  const filteredStaff = useMemo(() => {
+    let filtered = allStaff;
+
+    // Search term filter
+    if (searchParams.searchTerm) {
+      const searchLower = searchParams.searchTerm.toLowerCase();
+      filtered = filtered.filter(staff =>
+        staff.fullName.toLowerCase().includes(searchLower) ||
+        staff.appointmentNumber.toLowerCase().includes(searchLower) ||
+        staff.nicNumber.toLowerCase().includes(searchLower) ||
+        (staff.nicNumberOld && staff.nicNumberOld.toLowerCase().includes(searchLower))
+      );
+    }
+
+    // Designation filter
+    if (searchParams.designation) {
+      filtered = filtered.filter(staff => staff.designation === searchParams.designation);
+    }
+
+    // Age range filter - Fixed type issues
+    if (searchParams.ageMin !== undefined && searchParams.ageMin !== null) {
+      const minAge = typeof searchParams.ageMin === 'string' ? parseInt(searchParams.ageMin) : searchParams.ageMin;
+      if (!isNaN(minAge)) {
+        filtered = filtered.filter(staff => staff.age >= minAge);
+      }
+    }
+
+    if (searchParams.ageMax !== undefined && searchParams.ageMax !== null) {
+      const maxAge = typeof searchParams.ageMax === 'string' ? parseInt(searchParams.ageMax) : searchParams.ageMax;
+      if (!isNaN(maxAge)) {
+        filtered = filtered.filter(staff => staff.age <= maxAge);
+      }
+    }
+
+    // NIC number filter
+    if (searchParams.nicNumber) {
+      const nicLower = searchParams.nicNumber.toLowerCase();
+      filtered = filtered.filter(staff =>
+        staff.nicNumber.toLowerCase().includes(nicLower) ||
+        (staff.nicNumberOld && staff.nicNumberOld.toLowerCase().includes(nicLower))
+      );
+    }
+
+    // Salary code filter
+    if (searchParams.salaryCode) {
+      filtered = filtered.filter(staff => staff.salaryCode === searchParams.salaryCode);
+    }
+
+    return filtered;
+  }, [allStaff, searchParams]);
+
+  // Debounced search function - Fixed type issues
   const debouncedSearch = useMemo(
-    () => debounce((params: StaffSearchParams) => {
-      setSearchParams(params);
+    () => debounce((field: keyof StaffSearchParams, value: string | number | undefined) => {
+      setSearchParams(prev => ({
+        ...prev,
+        [field]: value || undefined
+      }));
     }, 300),
     []
   );
 
-  const staffList = Object.values(searchParams).some(val => val !== undefined && val !== '')
-    ? searchResults
-    : allStaff;
-
-  const isLoading = isLoadingAll || isSearching;
-
   const handleSearch = (field: keyof StaffSearchParams, value: string) => {
-    const newParams = { ...searchParams, [field]: value || undefined };
-    debouncedSearch(newParams);
+    if (field === 'ageMin' || field === 'ageMax') {
+      const numValue = value === '' ? undefined : parseInt(value);
+      // Only call if we have a valid value or undefined
+      if (numValue !== undefined || value === '') {
+        debouncedSearch(field, numValue);
+      }
+    } else {
+      debouncedSearch(field, value);
+    }
   };
 
   const handleClearFilters = () => {
@@ -54,10 +108,10 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
   };
 
   const handleSelectAll = () => {
-    if (selectedStaff.size === staffList.length) {
+    if (selectedStaff.size === filteredStaff.length) {
       setSelectedStaff(new Set());
     } else {
-      setSelectedStaff(new Set(staffList.map(staff => staff.id)));
+      setSelectedStaff(new Set(filteredStaff.map(staff => staff.id)));
     }
   };
 
@@ -69,6 +123,14 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
       newSelected.add(staffId);
     }
     setSelectedStaff(newSelected);
+  };
+
+  const handleViewStaff = (staffId: string) => {
+    setViewDialog({ open: true, staffId });
+  };
+
+  const handleEditStaff = (staffId: string) => {
+    setEditDialog({ open: true, staffId });
   };
 
   const handleDelete = async () => {
@@ -101,6 +163,15 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
     }
   };
 
+  const handleStaffUpdated = () => {
+    // This will trigger a refetch through react-query
+    setEditDialog({ open: false, staffId: null });
+  };
+
+  const hasActiveFilters = Object.values(searchParams).some(val =>
+    val !== undefined && val !== null && val !== ''
+  );
+
   return (
     <div className="space-y-6">
       {/* Search and Filter Controls */}
@@ -114,6 +185,7 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
                 placeholder="Search by name, appointment number, or NIC..."
                 className="pl-10"
                 onChange={(e) => handleSearch('searchTerm', e.target.value)}
+                value={searchParams.searchTerm || ''}
               />
             </div>
           </div>
@@ -132,7 +204,7 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
           <Button
             variant="outline"
             onClick={handleClearFilters}
-            disabled={Object.values(searchParams).every(val => !val)}
+            disabled={!hasActiveFilters}
           >
             Clear
           </Button>
@@ -145,7 +217,10 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Designation
               </label>
-              <Select onValueChange={(value) => handleSearch('designation', value)}>
+              <Select
+                value={searchParams.designation || ''}
+                onValueChange={(value) => handleSearch('designation', value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select designation" />
                 </SelectTrigger>
@@ -168,11 +243,13 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
                 <Input
                   type="number"
                   placeholder="Min"
+                  value={searchParams.ageMin?.toString() || ''}
                   onChange={(e) => handleSearch('ageMin', e.target.value)}
                 />
                 <Input
                   type="number"
                   placeholder="Max"
+                  value={searchParams.ageMax?.toString() || ''}
                   onChange={(e) => handleSearch('ageMax', e.target.value)}
                 />
               </div>
@@ -182,7 +259,10 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Salary Code
               </label>
-              <Select onValueChange={(value) => handleSearch('salaryCode', value)}>
+              <Select
+                value={searchParams.salaryCode || ''}
+                onValueChange={(value) => handleSearch('salaryCode', value)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Select salary code" />
                 </SelectTrigger>
@@ -242,14 +322,15 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
                 Staff Directory
               </h2>
               <span className="text-sm text-slate-600">
-                {isLoading ? 'Loading...' : `${staffList.length} staff found`}
+                {isLoadingAll ? 'Loading...' : `${filteredStaff.length} staff found`}
+                {hasActiveFilters && ` (filtered from ${allStaff.length} total)`}
               </span>
             </div>
 
-            {staffList.length > 0 && (
+            {filteredStaff.length > 0 && (
               <div className="flex items-center space-x-2">
                 <Checkbox
-                  checked={selectedStaff.size === staffList.length}
+                  checked={selectedStaff.size === filteredStaff.length && filteredStaff.length > 0}
                   onCheckedChange={handleSelectAll}
                 />
                 <span className="text-sm text-slate-600">Select All</span>
@@ -259,7 +340,7 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
         </div>
 
         <div className="p-6">
-          {isLoading ? (
+          {isLoadingAll ? (
             <div className="space-y-4">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="animate-pulse">
@@ -267,18 +348,18 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
                 </div>
               ))}
             </div>
-          ) : staffList.length === 0 ? (
+          ) : filteredStaff.length === 0 ? (
             <div className="text-center py-12">
               <Users className="h-12 w-12 text-slate-400 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-slate-700 mb-2">No staff found</h3>
               <p className="text-slate-500 mb-4">
-                {Object.values(searchParams).some(val => val)
+                {hasActiveFilters
                   ? 'Try adjusting your search filters'
                   : 'No staff records in the database'
                 }
               </p>
-              {!Object.values(searchParams).some(val => val) && (
-                <Button onClick={() => onEditStaff('')} className="flex items-center space-x-2">
+              {!hasActiveFilters && (
+                <Button className="flex items-center space-x-2">
                   <Plus className="h-4 w-4" />
                   <span>Add First Staff</span>
                 </Button>
@@ -286,7 +367,7 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
             </div>
           ) : (
             <div className="space-y-4">
-              {staffList.map((staff) => (
+              {filteredStaff.map((staff) => (
                 <div
                   key={staff.id}
                   className="border border-slate-200 rounded-lg p-4 hover:border-slate-300 hover:shadow-md transition-all"
@@ -328,7 +409,7 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => onViewStaff(staff.id)}
+                            onClick={() => handleViewStaff(staff.id)}
                             className="flex items-center space-x-1"
                           >
                             <Eye className="h-4 w-4" />
@@ -337,7 +418,7 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => onEditStaff(staff.id)}
+                            onClick={() => handleEditStaff(staff.id)}
                             className="flex items-center space-x-1"
                           >
                             <Edit className="h-4 w-4" />
@@ -362,6 +443,21 @@ export function SearchStaff({ onViewStaff, onEditStaff }: SearchStaffProps) {
           )}
         </div>
       </div>
+
+      {/* View Staff Dialog */}
+      <ViewStaffDialog
+        isOpen={viewDialog.open}
+        onClose={() => setViewDialog({ open: false, staffId: null })}
+        staffId={viewDialog.staffId}
+      />
+
+      {/* Edit Staff Dialog */}
+      <EditStaffDialog
+        isOpen={editDialog.open}
+        onClose={() => setEditDialog({ open: false, staffId: null })}
+        staffId={editDialog.staffId}
+        onStaffUpdated={handleStaffUpdated}
+      />
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={deleteConfirm.open} onOpenChange={(open) => setDeleteConfirm({ open })}>

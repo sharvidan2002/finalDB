@@ -109,7 +109,7 @@ export function downloadContent(content: string, filename: string, mimeType: str
 }
 
 /**
- * Print content in new window
+ * Print content in new window with better PDF export experience
  */
 export function printContent(content: string) {
   const printWindow = window.open('', '_blank');
@@ -118,8 +118,10 @@ export function printContent(content: string) {
     printWindow.document.close();
 
     printWindow.onload = () => {
-      printWindow.print();
-      printWindow.close();
+      // Auto-trigger print dialog for PDF export
+      setTimeout(() => {
+        printWindow.print();
+      }, 500);
     };
   }
 }
