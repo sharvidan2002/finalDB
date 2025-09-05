@@ -4,8 +4,7 @@
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
     "devPath": "http://localhost:1420",
-    "distDir": "../dist",
-    "withGlobalTauri": false
+    "distDir": "../dist"
   },
   "package": {
     "productName": "Forest Office Staff Management",
@@ -13,18 +12,14 @@
   },
   "tauri": {
     "allowlist": {
-      "all": false,
       "shell": {
-        "all": false,
         "open": true
       },
       "dialog": {
-        "all": false,
         "open": true,
         "save": true
       },
       "fs": {
-        "all": false,
         "readFile": true,
         "writeFile": true,
         "createDir": true,
@@ -34,7 +29,6 @@
         "all": true
       },
       "window": {
-        "all": false,
         "close": true,
         "hide": true,
         "show": true,
@@ -48,8 +42,7 @@
         "all": true,
         "asset": true,
         "assetScope": {
-          "allow": ["**"],
-          "deny": []
+          "allow": ["**"]
         }
       }
     },
@@ -70,14 +63,13 @@
     },
     "windows": [
       {
-        "fullscreen": false,
-        "resizable": true,
         "title": "Divisional Forest Office - Staff Management",
         "width": 1200,
         "height": 800,
         "minWidth": 1000,
         "minHeight": 600,
-        "center": true
+        "center": true,
+        "resizable": true
       }
     ]
   }
