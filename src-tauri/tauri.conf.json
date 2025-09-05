@@ -43,6 +43,14 @@
         "unmaximize": true,
         "unminimize": true,
         "startDragging": true
+      },
+      "protocol": {
+        "all": true,
+        "asset": true,
+        "assetScope": {
+          "allow": ["**"],
+          "deny": []
+        }
       }
     },
     "bundle": {
