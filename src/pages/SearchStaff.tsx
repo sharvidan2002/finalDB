@@ -26,7 +26,7 @@ export function SearchStaff() {
   const exportToPDF = useExportToPDF();
   const openDownloads = useOpenDownloadsFolder();
 
-  // Filter staff based on search parameters
+  // Filter staff based on search parameters (Frontend filtering)
   const filteredStaff = useMemo(() => {
     let filtered = allStaff;
 
@@ -44,6 +44,14 @@ export function SearchStaff() {
     // Designation filter
     if (searchParams.designation) {
       filtered = filtered.filter(staff => staff.designation === searchParams.designation);
+    }
+
+    // Gender filter - Fixed logic
+    if (searchParams.gender) {
+      filtered = filtered.filter(staff => {
+        console.log(`Filtering: Staff ${staff.fullName} has gender "${staff.gender}", looking for "${searchParams.gender}"`);
+        return staff.gender === searchParams.gender;
+      });
     }
 
     // Age range filter
@@ -81,6 +89,7 @@ export function SearchStaff() {
   // Debounced search function
   const debouncedSearch = useMemo(
     () => debounce((field: keyof StaffSearchParams, value: string | number | undefined) => {
+      console.log(`Setting search param: ${field} = ${value}`);
       setSearchParams(prev => ({
         ...prev,
         [field]: value || undefined
@@ -102,7 +111,8 @@ export function SearchStaff() {
 
   // Handle Select changes with special "all" value
   const handleSelectChange = (field: keyof StaffSearchParams, value: string) => {
-    if (value === 'all') {
+    console.log(`Select change: ${field} = ${value}`);
+    if (value === 'all' || value === '') {
       debouncedSearch(field, undefined);
     } else {
       debouncedSearch(field, value);
@@ -185,6 +195,7 @@ export function SearchStaff() {
 
   return (
     <div className="space-y-6">
+
       {/* Search and Filter Controls */}
       <div className="bg-white rounded-lg shadow-md border p-6 space-y-4">
         <div className="flex flex-col lg:flex-row gap-4">
@@ -223,7 +234,7 @@ export function SearchStaff() {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 pt-4 border-t">
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-2">
                 Designation
@@ -242,6 +253,25 @@ export function SearchStaff() {
                       {designation}
                     </SelectItem>
                   ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-2">
+                Gender
+              </label>
+              <Select
+                value={searchParams.gender || 'all'}
+                onValueChange={(value) => handleSelectChange('gender', value)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Genders</SelectItem>
+                  <SelectItem value="Male">Male</SelectItem>
+                  <SelectItem value="Female">Female</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -402,7 +432,7 @@ export function SearchStaff() {
                           </h3>
                           <p className="text-slate-600">{staff.designation}</p>
                           <p className="text-sm text-slate-500">
-                            Appointment No: {staff.appointmentNumber} | Age: {staff.age} | NIC: {staff.nicNumber}
+                            Appointment No: {staff.appointmentNumber} | Age: {staff.age} | Gender: {staff.gender} | NIC: {staff.nicNumber}
                           </p>
                           <p className="text-sm text-slate-500">
                             Salary: {formatCurrency(staff.basicSalary)} ({staff.salaryCode})

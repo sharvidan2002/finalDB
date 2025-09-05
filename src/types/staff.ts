@@ -73,6 +73,7 @@ export interface UpdateStaffRequest extends CreateStaffRequest {
 export interface StaffSearchParams {
   searchTerm?: string;
   designation?: string;
+  gender?: 'Male' | 'Female';
   ageMin?: number;
   ageMax?: number;
   nicNumber?: string;
@@ -115,9 +116,15 @@ export const MARITAL_STATUSES = [
   'Widowed',
 ] as const;
 
+export const GENDERS = [
+  'Male',
+  'Female',
+] as const;
+
 export type Designation = typeof DESIGNATIONS[number];
 export type SalaryCode = typeof SALARY_CODES[number];
 export type MaritalStatus = typeof MARITAL_STATUSES[number];
+export type Gender = typeof GENDERS[number];
 
 export const FORM_DEFAULTS = {
   GENDER: 'Male' as const,
