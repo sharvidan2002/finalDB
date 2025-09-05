@@ -245,14 +245,7 @@ export function ViewStaffDialog({ isOpen, onClose, staffId }: ViewStaffDialogPro
                   </div>
                 </div>
 
-                <div className="mt-4 pt-3 border-t border-slate-200">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-slate-600">Total Salary (Basic + Increment)</span>
-                    <span className="text-lg font-bold text-green-700">
-                      {formatCurrency(staff.basicSalary + staff.incrementAmount)}
-                    </span>
-                  </div>
-                </div>
+
               </div>
             </div>
           </div>
