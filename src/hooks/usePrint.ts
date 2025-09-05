@@ -116,7 +116,7 @@ export function usePrintIndividual() {
         removeNotification(loadingNotification);
 
         // Show success message with option to open Downloads folder
-        showNotification('PDF saved to Downloads folder! Click "Open Downloads" to view.', 'success');
+        showNotification('PDF file opened in browser for printing! Click "Open Downloads" to view files.', 'success');
 
         return result;
       } catch (error) {
@@ -146,7 +146,7 @@ export function usePrintBulk() {
         removeNotification(loadingNotification);
 
         // Show success message with option to open Downloads folder
-        showNotification('Staff directory PDF saved to Downloads! Click "Open Downloads" to view.', 'success');
+        showNotification('Staff directory PDF opened in browser for printing! Click "Open Downloads" to view files.', 'success');
 
         return result;
       } catch (error) {
@@ -181,8 +181,8 @@ export function useExportToPDF() {
 
         // Show success message
         const message = isMultiple
-          ? 'Staff directory PDF saved to Downloads! Click "Open Downloads" to view.'
-          : 'Staff details PDF saved to Downloads! Click "Open Downloads" to view.';
+          ? 'Staff directory PDF opened in browser for printing! Click "Open Downloads" to view files.'
+          : 'Staff details PDF opened in browser for printing! Click "Open Downloads" to view files.';
 
         showNotification(message, 'success');
 
@@ -217,6 +217,26 @@ export function useOpenDownloadsFolder() {
   });
 }
 
+// Clean up temporary image files
+export function useCleanupTempFiles() {
+  return useMutation({
+    mutationFn: async () => {
+      try {
+        const result = await invoke<string>('cleanup_temp_files');
+        showNotification('Temporary files cleaned up successfully!', 'success');
+        return result;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        showNotification(`Failed to cleanup files: ${errorMessage}`, 'error');
+        throw error;
+      }
+    },
+    onError: (error) => {
+      console.error('Cleanup temp files failed:', error);
+    }
+  });
+}
+
 // Legacy function names for backward compatibility
 export function usePrintDirect() {
   return useExportToPDF();
@@ -229,5 +249,6 @@ export function usePrintWithPreview() {
     generateBulkPreview: useGenerateBulkStaffPreview(),
     exportToPDF: useExportToPDF(),
     openDownloads: useOpenDownloadsFolder(),
+    cleanup: useCleanupTempFiles(),
   };
 }

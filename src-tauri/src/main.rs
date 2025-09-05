@@ -40,7 +40,7 @@ fn main() {
             export_staff_pdf,
             open_downloads_folder,
 
-            // NEW: Preview commands
+            // Preview commands
             generate_staff_preview,
             generate_bulk_staff_preview,
 

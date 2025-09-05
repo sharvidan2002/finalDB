@@ -807,6 +807,15 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
     let address = format_address_html(staff);
     let current_date = chrono::Utc::now().format("%d-%m-%Y").to_string();
 
+    // Generate photo HTML if image data exists
+    let photo_html = if let Some(image_data) = &staff.image_data {
+        format!(r#"<img src="data:image/jpeg;base64,{}" alt="Staff Photo" class="staff-photo">"#, image_data)
+    } else {
+        r#"<div class="staff-photo-placeholder">
+            <div class="photo-text">PHOTO</div>
+        </div>"#.to_string()
+    };
+
     format!(r#"
 <!DOCTYPE html>
 <html>
@@ -834,6 +843,7 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
             border-bottom: 3px double #000;
             padding-bottom: 15px;
             margin-bottom: 25px;
+            position: relative;
         }}
         .org-title {{
             font-size: 20px;
@@ -857,8 +867,38 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
             margin-top: 15px;
             text-decoration: underline;
         }}
+        .staff-photo {{
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 120px;
+            height: 150px;
+            object-fit: cover;
+            border: 2px solid #000;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        }}
+
+        .staff-photo-placeholder {{
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 120px;
+            height: 150px;
+            border: 2px solid #000;
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }}
+
+        .photo-text {{
+            font-size: 12px;
+            font-weight: bold;
+            color: #666;
+        }}
         .content {{
             padding: 0 20px;
+            margin-right: 140px; /* Make space for photo */
         }}
         .section {{
             margin-bottom: 25px;
@@ -893,6 +933,7 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
             margin-top: 40px;
             display: table;
             width: 100%;
+            margin-right: 0; /* Reset margin for signatures */
         }}
         .signature-box {{
             display: table-cell;
@@ -919,6 +960,9 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
         .clearfix {{
             clear: both;
         }}
+        .signature-full-width {{
+            margin-right: 0 !important;
+        }}
         @media print {{
             body {{ margin: 0; padding: 0; }}
             .document {{ margin: 0; box-shadow: none; }}
@@ -933,6 +977,9 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
             <div class="org-subtitle">Divisional Forest Office</div>
             <div class="org-location">Vavuniya, North Central Province</div>
             <div class="document-title">Official Staff Record</div>
+
+            <!-- Staff Photo positioned in top right -->
+            {}
         </div>
 
         <div class="content">
@@ -1032,18 +1079,18 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
                     <div class="field-value">{}</div>
                 </div>
             </div>
+        </div>
 
-            <div class="signature-section">
-                <div class="signature-box">
-                    <div class="signature-line">
-                        Staff Member Signature
-                    </div>
+        <div class="signature-section signature-full-width">
+            <div class="signature-box">
+                <div class="signature-line">
+                    Staff Member Signature
                 </div>
-                <div class="signature-box">
-                    <div class="signature-line">
-                        Authorized Officer Signature<br>
-                        Divisional Forest Office
-                    </div>
+            </div>
+            <div class="signature-box">
+                <div class="signature-line">
+                    Authorized Officer Signature<br>
+                    Divisional Forest Office
                 </div>
             </div>
         </div>
@@ -1059,6 +1106,7 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
 </html>
     "#,
         staff.full_name,
+        photo_html,
         staff.appointment_number,
         staff.full_name,
         staff.gender,
