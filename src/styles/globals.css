@@ -238,4 +238,274 @@
     border-radius: 50%;
     animation: pdf-spin 1s linear infinite;
   }
+
+  /* Professional Print Preview Styles */
+  .print-preview-container {
+    @apply bg-gray-100 p-4 rounded-lg;
+  }
+
+  .print-document {
+    @apply bg-white shadow-xl mx-auto;
+    min-height: 297mm;
+    width: 210mm;
+    font-family: "Times New Roman", serif;
+  }
+
+  .print-document.landscape {
+    width: 297mm;
+    min-height: 210mm;
+  }
+
+  .print-header {
+    @apply text-center border-b-2 border-black pb-4 mb-6;
+  }
+
+  .print-section {
+    @apply mb-6;
+  }
+
+  .print-section-title {
+    @apply text-base font-bold uppercase border-b border-black pb-1 mb-3;
+  }
+
+  .print-field-row {
+    @apply flex mb-2;
+  }
+
+  .print-field-label {
+    @apply font-bold;
+    width: 180px;
+  }
+
+  .print-field-value {
+    @apply flex-1 border-b border-dotted border-gray-400 pb-1;
+  }
+
+  .print-signature-section {
+    @apply flex justify-between mt-8;
+  }
+
+  .print-signature-box {
+    @apply text-center w-48;
+  }
+
+  .print-signature-line {
+    @apply border-t border-black mt-10 pt-2 text-sm;
+  }
+
+  .print-footer {
+    @apply border-t border-black pt-3 text-xs text-center;
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    right: 20px;
+  }
+
+  .print-table {
+    @apply w-full border-collapse;
+    font-size: 10px;
+  }
+
+  .print-table th,
+  .print-table td {
+    @apply border border-black p-2 text-left;
+  }
+
+  .print-table th {
+    @apply bg-gray-200 font-bold text-center;
+  }
+
+  .print-zoom-controls {
+    @apply flex items-center space-x-2 bg-white border rounded-md p-1;
+  }
+
+  .print-preview-loading {
+    @apply flex items-center justify-center h-96;
+  }
+
+  .print-preview-error {
+    @apply flex items-center justify-center h-96;
+  }
+
+  .print-preview-error-content {
+    @apply text-center;
+  }
+
+  .print-preview-error-box {
+    @apply bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4;
+  }
+
+  /* Professional document styling for preview */
+  .document-preview {
+    font-family: "Times New Roman", serif;
+    line-height: 1.4;
+    color: #000;
+  }
+
+  .document-preview .org-header {
+    text-align: center;
+    margin-bottom: 20px;
+  }
+
+  .document-preview .field-container {
+    margin-bottom: 8px;
+    display: flex;
+    align-items: baseline;
+  }
+
+  .document-preview .field-label {
+    font-weight: bold;
+    width: 180px;
+    display: inline-block;
+  }
+
+  .document-preview .field-value {
+    flex: 1;
+    border-bottom: 1px dotted #333;
+    padding-bottom: 2px;
+  }
+
+  .document-preview .section-header {
+    font-size: 16px;
+    font-weight: bold;
+    text-transform: uppercase;
+    border-bottom: 2px solid #000;
+    padding-bottom: 5px;
+    margin: 20px 0 15px 0;
+  }
+
+  .document-preview .total-salary {
+    background: #f0f0f0;
+    border: 2px solid #000;
+    padding: 10px;
+    margin: 15px 0;
+    text-align: center;
+    font-weight: bold;
+  }
+
+  .document-preview .signature-area {
+    margin-top: 40px;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .document-preview .signature-box {
+    text-align: center;
+    width: 200px;
+  }
+
+  .document-preview .signature-line {
+    border-top: 1px solid #000;
+    margin-top: 40px;
+    padding-top: 5px;
+    font-size: 12px;
+  }
+
+  /* Responsive print preview */
+  @media (max-width: 768px) {
+    .print-document {
+      width: 100%;
+      min-height: auto;
+      margin: 0;
+    }
+
+    .print-preview-container {
+      padding: 2px;
+    }
+  }
+
+  /* Print-specific overrides */
+  @media print {
+    .print-preview-container {
+      background: white !important;
+      padding: 0 !important;
+    }
+
+    .print-document {
+      box-shadow: none !important;
+      margin: 0 !important;
+      width: 100% !important;
+    }
+
+    .print-zoom-controls,
+    .no-print {
+      display: none !important;
+    }
+  }
+
+  /* Animation for loading states */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .print-preview-fade-in {
+    animation: fadeInUp 0.3s ease-out;
+  }
+
+  /* Professional table styling for bulk reports */
+  .professional-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 20px 0;
+    font-size: 9px;
+    font-family: "Times New Roman", serif;
+  }
+
+  .professional-table th {
+    background: #e0e0e0;
+    border: 1px solid #000;
+    padding: 8px 4px;
+    text-align: center;
+    font-weight: bold;
+    font-size: 10px;
+  }
+
+  .professional-table td {
+    border: 1px solid #000;
+    padding: 6px 4px;
+    vertical-align: top;
+    font-size: 9px;
+  }
+
+  .professional-table tr:nth-child(even) {
+    background: #f9f9f9;
+  }
+
+  /* Official document watermark (optional) */
+  .document-watermark {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-45deg);
+    font-size: 72px;
+    color: rgba(0, 0, 0, 0.05);
+    font-weight: bold;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* Enhanced zoom transition */
+  .print-preview-zoom {
+    transition: transform 0.2s ease-in-out;
+  }
+
+  /* Status indicators */
+  .preview-status-ready {
+    @apply w-2 h-2 bg-green-500 rounded-full;
+  }
+
+  .preview-status-loading {
+    @apply w-2 h-2 bg-yellow-500 rounded-full animate-pulse;
+  }
+
+  .preview-status-error {
+    @apply w-2 h-2 bg-red-500 rounded-full;
+  }
 }

@@ -1,11 +1,12 @@
 import { useState, useMemo } from 'react';
-import { Search, Filter, Eye, Edit, Trash2, Users, Download, Plus } from 'lucide-react';
+import { Search, Filter, Eye, Edit, Trash2, Users, Download, Plus, FileText } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Checkbox } from '../components/ui/checkbox';
 import { ViewStaffDialog, EditStaffDialog } from '../components/dialogs';
+import { ProfessionalPrintPreview } from '../components/staff/ProfessionalPrintPreview';
 import { useStaffList } from '../hooks/useStaff';
 import { useDeleteStaff } from '../hooks/useStaffMutations';
 import { useExportToPDF } from '../hooks/usePrint';
@@ -20,6 +21,7 @@ export function SearchStaff() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; staff?: Staff }>({ open: false });
   const [viewDialog, setViewDialog] = useState<{ open: boolean; staffId: string | null }>({ open: false, staffId: null });
   const [editDialog, setEditDialog] = useState<{ open: boolean; staffId: string | null }>({ open: false, staffId: null });
+  const [showBulkPrintPreview, setShowBulkPrintPreview] = useState(false);
 
   const { data: allStaff = [], isLoading: isLoadingAll } = useStaffList();
   const deleteStaff = useDeleteStaff();
@@ -163,6 +165,12 @@ export function SearchStaff() {
     }
   };
 
+  const handleShowBulkPrintPreview = () => {
+    if (selectedStaff.size > 0) {
+      setShowBulkPrintPreview(true);
+    }
+  };
+
   const handleStaffUpdated = () => {
     setEditDialog({ open: false, staffId: null });
   };
@@ -290,6 +298,15 @@ export function SearchStaff() {
               <Button
                 size="sm"
                 variant="outline"
+                onClick={handleShowBulkPrintPreview}
+                className="flex items-center space-x-2"
+              >
+                <FileText className="h-4 w-4" />
+                <span>Print Preview</span>
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
                 onClick={handleBulkExport}
                 disabled={exportToPDF.isPending}
                 className="flex items-center space-x-2"
@@ -298,7 +315,7 @@ export function SearchStaff() {
                   <div className="w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />
                 )}
                 <Download className="h-4 w-4" />
-                <span>Export Selected</span>
+                <span>Export PDF</span>
               </Button>
             </div>
           </div>
@@ -449,6 +466,15 @@ export function SearchStaff() {
         onClose={() => setEditDialog({ open: false, staffId: null })}
         staffId={editDialog.staffId}
         onStaffUpdated={handleStaffUpdated}
+      />
+
+      {/* Bulk Print Preview Dialog */}
+      <ProfessionalPrintPreview
+        isOpen={showBulkPrintPreview}
+        onClose={() => setShowBulkPrintPreview(false)}
+        staffIds={Array.from(selectedStaff)}
+        isBulk={true}
+        title={`Staff Directory (${selectedStaff.size} records)`}
       />
 
       {/* Delete Confirmation Dialog */}

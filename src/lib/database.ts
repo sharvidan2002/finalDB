@@ -71,6 +71,15 @@ export const staffDatabase = {
 
 // Print operations
 export const printService = {
+
+  async generateStaffPreview(staffId: string): Promise<string> {
+    return await invoke<string>('generate_staff_preview', { staffId });
+  },
+
+  async generateBulkStaffPreview(staffIds: string[]): Promise<string> {
+    return await invoke<string>('generate_bulk_staff_preview', { staffIds });
+  },
+
   async printIndividual(staffId: string): Promise<string> {
     return await invoke<string>('print_staff_individual', { staffId });
   },

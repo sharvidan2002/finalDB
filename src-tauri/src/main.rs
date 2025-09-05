@@ -40,6 +40,10 @@ fn main() {
             export_staff_pdf,
             open_downloads_folder,
 
+            // NEW: Preview commands
+            generate_staff_preview,
+            generate_bulk_staff_preview,
+
             // Legacy print commands (now generate PDFs)
             print_staff_individual,
             print_staff_bulk

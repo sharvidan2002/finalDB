@@ -67,6 +67,45 @@ function removeNotification(notification: HTMLElement) {
   }
 }
 
+// Generate preview HTML for individual staff
+export function useGenerateStaffPreview() {
+  return useMutation({
+    mutationFn: async (staffId: string) => {
+      try {
+        const result = await invoke<string>('generate_staff_preview', { staffId });
+        return result;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        showNotification(`Failed to generate preview: ${errorMessage}`, 'error');
+        throw error;
+      }
+    },
+    onError: (error) => {
+      console.error('Generate staff preview failed:', error);
+    }
+  });
+}
+
+// Generate preview HTML for bulk staff
+export function useGenerateBulkStaffPreview() {
+  return useMutation({
+    mutationFn: async (staffIds: string[]) => {
+      try {
+        const result = await invoke<string>('generate_bulk_staff_preview', { staffIds });
+        return result;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        showNotification(`Failed to generate preview: ${errorMessage}`, 'error');
+        throw error;
+      }
+    },
+    onError: (error) => {
+      console.error('Generate bulk staff preview failed:', error);
+    }
+  });
+}
+
+// Print individual staff record
 export function usePrintIndividual() {
   return useMutation({
     mutationFn: async (staffId: string) => {
@@ -93,6 +132,7 @@ export function usePrintIndividual() {
   });
 }
 
+// Print bulk staff records
 export function usePrintBulk() {
   return useMutation({
     mutationFn: async (staffIds: string[]) => {
@@ -122,12 +162,13 @@ export function usePrintBulk() {
   });
 }
 
+// Export to PDF with professional template
 export function useExportToPDF() {
   return useMutation({
     mutationFn: async ({ staffIds, isBulk }: { staffIds: string[]; isBulk: boolean }) => {
       const isMultiple = isBulk || staffIds.length > 1;
       const loadingNotification = showNotification(
-        `Generating PDF for ${isMultiple ? `${staffIds.length} staff records` : 'staff record'}...`,
+        `Generating professional PDF for ${isMultiple ? `${staffIds.length} staff records` : 'staff record'}...`,
         'loading'
       );
 
@@ -159,7 +200,7 @@ export function useExportToPDF() {
   });
 }
 
-// Helper function to open Downloads folder
+// Open Downloads folder
 export function useOpenDownloadsFolder() {
   return useMutation({
     mutationFn: async () => {
@@ -179,4 +220,14 @@ export function useOpenDownloadsFolder() {
 // Legacy function names for backward compatibility
 export function usePrintDirect() {
   return useExportToPDF();
+}
+
+// New hook for showing print preview dialog
+export function usePrintWithPreview() {
+  return {
+    generatePreview: useGenerateStaffPreview(),
+    generateBulkPreview: useGenerateBulkStaffPreview(),
+    exportToPDF: useExportToPDF(),
+    openDownloads: useOpenDownloadsFolder(),
+  };
 }
