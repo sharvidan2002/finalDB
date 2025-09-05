@@ -4,4 +4,3 @@ export { StaffForm } from './StaffForm';
 export { StaffView } from './StaffView';
 export { ProfessionalPrintPreview } from './ProfessionalPrintPreview';
 export { PrintPreview } from './PrintPreview';
-export { ImageCropper } from './ImageCropper';
