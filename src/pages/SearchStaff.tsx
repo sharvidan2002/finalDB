@@ -1,15 +1,14 @@
 import { useState, useMemo } from 'react';
-import { Search, Filter, Eye, Edit, Trash2, Users, Download, Plus, FileText } from 'lucide-react';
+import { Search, Filter, Eye, Edit, Trash2, Users, Download, Plus } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../components/ui/select';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { Checkbox } from '../components/ui/checkbox';
 import { ViewStaffDialog, EditStaffDialog } from '../components/dialogs';
-import { ProfessionalPrintPreview } from '../components/staff/ProfessionalPrintPreview';
 import { useStaffList } from '../hooks/useStaff';
 import { useDeleteStaff } from '../hooks/useStaffMutations';
-import { useExportToPDF } from '../hooks/usePrint';
+import { useExportToPDF, useOpenDownloadsFolder } from '../hooks/usePrint';
 import { formatCurrency, debounce } from '../lib/utils';
 import { DESIGNATIONS, SALARY_CODES } from '../types/staff';
 import type { Staff, StaffSearchParams } from '../types/staff';
@@ -21,11 +20,11 @@ export function SearchStaff() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ open: boolean; staff?: Staff }>({ open: false });
   const [viewDialog, setViewDialog] = useState<{ open: boolean; staffId: string | null }>({ open: false, staffId: null });
   const [editDialog, setEditDialog] = useState<{ open: boolean; staffId: string | null }>({ open: false, staffId: null });
-  const [showBulkPrintPreview, setShowBulkPrintPreview] = useState(false);
 
   const { data: allStaff = [], isLoading: isLoadingAll } = useStaffList();
   const deleteStaff = useDeleteStaff();
   const exportToPDF = useExportToPDF();
+  const openDownloads = useOpenDownloadsFolder();
 
   // Filter staff based on search parameters
   const filteredStaff = useMemo(() => {
@@ -156,18 +155,23 @@ export function SearchStaff() {
     }
   };
 
-  const handleBulkExport = () => {
+  const handleBulkExport = async () => {
     if (selectedStaff.size > 0) {
-      exportToPDF.mutate({
-        staffIds: Array.from(selectedStaff),
-        isBulk: true
-      });
-    }
-  };
+      try {
+        await exportToPDF.mutateAsync({
+          staffIds: Array.from(selectedStaff),
+          isBulk: true
+        });
 
-  const handleShowBulkPrintPreview = () => {
-    if (selectedStaff.size > 0) {
-      setShowBulkPrintPreview(true);
+        // Show option to open downloads folder after a short delay
+        setTimeout(() => {
+          if (window.confirm('PDF exported successfully! Would you like to open the Downloads folder?')) {
+            openDownloads.mutate();
+          }
+        }, 1000);
+      } catch (error) {
+        console.error('Bulk export failed:', error);
+      }
     }
   };
 
@@ -297,22 +301,13 @@ export function SearchStaff() {
             <div className="flex space-x-2">
               <Button
                 size="sm"
-                variant="outline"
-                onClick={handleShowBulkPrintPreview}
-                className="flex items-center space-x-2"
-              >
-                <FileText className="h-4 w-4" />
-                <span>Print Preview</span>
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
+                variant="default"
                 onClick={handleBulkExport}
                 disabled={exportToPDF.isPending}
                 className="flex items-center space-x-2"
               >
                 {exportToPDF.isPending && (
-                  <div className="w-4 h-4 border-2 border-slate-600 border-t-transparent rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
                 )}
                 <Download className="h-4 w-4" />
                 <span>Export PDF</span>
@@ -466,15 +461,6 @@ export function SearchStaff() {
         onClose={() => setEditDialog({ open: false, staffId: null })}
         staffId={editDialog.staffId}
         onStaffUpdated={handleStaffUpdated}
-      />
-
-      {/* Bulk Print Preview Dialog */}
-      <ProfessionalPrintPreview
-        isOpen={showBulkPrintPreview}
-        onClose={() => setShowBulkPrintPreview(false)}
-        staffIds={Array.from(selectedStaff)}
-        isBulk={true}
-        title={`Staff Directory (${selectedStaff.size} records)`}
       />
 
       {/* Delete Confirmation Dialog */}
