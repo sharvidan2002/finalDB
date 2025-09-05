@@ -711,9 +711,9 @@ fn generate_professional_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String
     let font_bold = doc.add_builtin_font(BuiltinFont::TimesBold)
         .map_err(|e| format!("Failed to add bold font: {}", e))?;
 
-    let margin_left = Mm(20.0);
-    let margin_right = Mm(190.0);
-    let mut current_y = Mm(277.0); // Start with top margin
+    let margin_left = Mm(15.0);
+    let margin_right = Mm(195.0);
+    let mut current_y = Mm(280.0); // Start with top margin
 
     // Official colors
     let black = Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None));
@@ -726,7 +726,7 @@ fn generate_professional_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String
             let (new_page, new_layer) = doc.add_page(Mm(210.0), Mm(297.0), &format!("Layer {}", *page + 1));
             *layer = doc.get_page(new_page).get_layer(new_layer);
             *page += 1;
-            *y = Mm(277.0); // Reset to top of new page
+            *y = Mm(280.0); // Reset to top of new page
 
             // Re-add header on new page
             layer.set_fill_color(black.clone());
@@ -739,26 +739,38 @@ fn generate_professional_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String
     // Official Header (without logo)
     current_layer.set_fill_color(black.clone());
 
-    // Government header
-    current_layer.use_text("GOVERNMENT OF SRI LANKA", 14.0, margin_left + Mm(30.0), current_y, &font_bold);
-    current_y -= Mm(8.0);
-
-    current_layer.use_text("Ministry of Environment and Natural Resources", 12.0, margin_left + Mm(20.0), current_y, &font_regular);
+    // Government header - centered
+    let gov_text = "GOVERNMENT OF SRI LANKA";
+    let gov_width = calculate_text_width(gov_text, 14.0);
+    current_layer.use_text(gov_text, 14.0, (Mm(210.0) - gov_width) / 2.0, current_y, &font_bold);
     current_y -= Mm(6.0);
 
-    current_layer.use_text("DIVISIONAL FOREST OFFICE", 16.0, margin_left + Mm(25.0), current_y, &font_bold);
+    let ministry_text = "Ministry of Environment and Natural Resources";
+    let ministry_width = calculate_text_width(ministry_text, 12.0);
+    current_layer.use_text(ministry_text, 12.0, (Mm(210.0) - ministry_width) / 2.0, current_y, &font_regular);
     current_y -= Mm(6.0);
 
-    current_layer.use_text("Vavuniya, North Central Province", 11.0, margin_left + Mm(35.0), current_y, &font_regular);
-    current_y -= Mm(15.0);
+    let office_text = "DIVISIONAL FOREST OFFICE";
+    let office_width = calculate_text_width(office_text, 16.0);
+    current_layer.use_text(office_text, 16.0, (Mm(210.0) - office_width) / 2.0, current_y, &font_bold);
+    current_y -= Mm(6.0);
 
-    // Draw official border line
-    draw_line(&current_layer, margin_left, current_y, margin_right, current_y, 2.0f32);
-    current_y -= Mm(15.0);
+    let location_text = "Vavuniya, North Central Province";
+    let location_width = calculate_text_width(location_text, 11.0);
+    current_layer.use_text(location_text, 11.0, (Mm(210.0) - location_width) / 2.0, current_y, &font_regular);
+    current_y -= Mm(12.0);
+
+    // Draw official double border line
+    draw_line(&current_layer, margin_left, current_y, margin_right, current_y, 1.5f32);
+    current_y -= Mm(3.0);
+    draw_line(&current_layer, margin_left, current_y, margin_right, current_y, 1.5f32);
+    current_y -= Mm(12.0);
 
     // Document title
     current_layer.set_fill_color(dark_blue.clone());
-    current_layer.use_text("OFFICIAL STAFF RECORD", 16.0, margin_left + Mm(35.0), current_y, &font_bold);
+    let title_text = "OFFICIAL STAFF RECORD";
+    let title_width = calculate_text_width(title_text, 16.0);
+    current_layer.use_text(title_text, 16.0, (Mm(210.0) - title_width) / 2.0, current_y, &font_bold);
     current_y -= Mm(20.0);
 
     current_layer.set_fill_color(black.clone());
@@ -835,29 +847,35 @@ fn generate_professional_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String
     current_y -= Mm(20.0);
     check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
 
-    // Signature section - ensure we have enough space
-    if current_y < Mm(40.0) {
+    // Add space for photo on the right side
+    let photo_x = Mm(150.0);
+    let photo_y = Mm(250.0);
+    let photo_width = Mm(40.0);
+    let photo_height = Mm(50.0);
+
+    // Draw photo placeholder box
+    draw_rect(&current_layer, photo_x, photo_y, photo_x + photo_width, photo_y - photo_height, 1.0);
+    current_layer.use_text("PHOTO", 8.0, photo_x + Mm(10.0), photo_y - Mm(25.0), &font_regular);
+
+    // Signature section
+    let signature_y = if current_y < Mm(40.0) {
         check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
-        current_y = Mm(277.0); // Start at top of new page for signatures
-    }
+        Mm(280.0) - Mm(40.0)
+    } else {
+        current_y
+    };
 
-    current_layer.use_text("Staff Member Signature:", 10.0, margin_left, current_y, &font_regular);
-    draw_line(&current_layer, margin_left + Mm(40.0), current_y - Mm(2.0), margin_left + Mm(80.0), current_y - Mm(2.0), 1.0f32);
+    current_layer.use_text("Staff Member Signature:", 10.0, margin_left, signature_y, &font_regular);
+    draw_line(&current_layer, margin_left + Mm(45.0), signature_y - Mm(2.0), margin_left + Mm(85.0), signature_y - Mm(2.0), 1.0f32);
 
-    current_layer.use_text("Authorized Officer Signature:", 10.0, margin_left + Mm(90.0), current_y, &font_regular);
-    draw_line(&current_layer, margin_left + Mm(130.0), current_y - Mm(2.0), margin_right, current_y - Mm(2.0), 1.0f32);
+    current_layer.use_text("Authorized Officer Signature:", 10.0, margin_left + Mm(100.0), signature_y, &font_regular);
+    draw_line(&current_layer, margin_left + Mm(145.0), signature_y - Mm(2.0), margin_right, signature_y - Mm(2.0), 1.0f32);
 
-    current_y -= Mm(8.0);
-    current_layer.use_text("Divisional Forest Office", 9.0, margin_left + Mm(130.0), current_y, &font_regular);
+    current_y = signature_y - Mm(8.0);
+    current_layer.use_text("Divisional Forest Office", 9.0, margin_left + Mm(145.0), current_y, &font_regular);
 
     // Footer - place at bottom of the last page
-    let footer_y = if current_page > 1 {
-        // For multi-page documents, put footer on last page
-        Mm(15.0)
-    } else {
-        // For single page, use calculated position but ensure it's not too low
-        std::cmp::min(current_y - Mm(10.0), Mm(15.0))
-    };
+    let footer_y = Mm(15.0);
 
     draw_line(&current_layer, margin_left, footer_y + Mm(5.0), margin_right, footer_y + Mm(5.0), 1.0f32);
 
@@ -866,10 +884,11 @@ fn generate_professional_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String
                              staff.appointment_number,
                              current_page,
                              current_page);
-    current_layer.use_text(footer_text, 8.0, margin_left, footer_y, &font_regular);
+    current_layer.use_text(&footer_text, 8.0, margin_left, footer_y, &font_regular);
 
     doc.save_to_bytes().map_err(|e| format!("Failed to generate PDF: {}", e))
 }
+
 fn generate_professional_bulk_pdf(staff_list: &[Staff]) -> Result<Vec<u8>, String> {
     let (doc, page1, layer1) = PdfDocument::new("Official Staff Directory", Mm(297.0), Mm(210.0), "Layer 1");
     let mut current_layer = doc.get_page(page1).get_layer(layer1);
@@ -887,11 +906,21 @@ fn generate_professional_bulk_pdf(staff_list: &[Staff]) -> Result<Vec<u8>, Strin
 
     // Official Header (without logo)
     current_layer.set_fill_color(black.clone());
-    current_layer.use_text("GOVERNMENT OF SRI LANKA - DIVISIONAL FOREST OFFICE", 16.0, Mm(60.0), current_y, &font_bold);
+
+    // Center the header text
+    let gov_text = "GOVERNMENT OF SRI LANKA - DIVISIONAL FOREST OFFICE";
+    let gov_width = calculate_text_width(gov_text, 16.0);
+    current_layer.use_text(gov_text, 16.0, (Mm(297.0) - gov_width) / 2.0, current_y, &font_bold);
     current_y -= Mm(8.0);
-    current_layer.use_text("OFFICIAL STAFF DIRECTORY", 14.0, Mm(90.0), current_y, &font_bold);
+
+    let title_text = "OFFICIAL STAFF DIRECTORY";
+    let title_width = calculate_text_width(title_text, 14.0);
+    current_layer.use_text(title_text, 14.0, (Mm(297.0) - title_width) / 2.0, current_y, &font_bold);
     current_y -= Mm(6.0);
-    current_layer.use_text("Vavuniya, North Central Province", 11.0, Mm(100.0), current_y, &font_regular);
+
+    let location_text = "Vavuniya, North Central Province";
+    let location_width = calculate_text_width(location_text, 11.0);
+    current_layer.use_text(location_text, 11.0, (Mm(297.0) - location_width) / 2.0, current_y, &font_regular);
     current_y -= Mm(15.0);
 
     draw_line(&current_layer, margin_left, current_y, margin_right, current_y, 2.0f32);
@@ -900,7 +929,7 @@ fn generate_professional_bulk_pdf(staff_list: &[Staff]) -> Result<Vec<u8>, Strin
     let summary_text = format!("Total Staff: {} | Generated: {} | Status: Confidential - Official Use Only",
                               staff_list.len(),
                               chrono::Utc::now().format("%d-%m-%Y"));
-    current_layer.use_text(summary_text, 10.0, margin_left, current_y, &font_regular);
+    current_layer.use_text(&summary_text, 10.0, margin_left, current_y, &font_regular);
     current_y -= Mm(20.0);
 
     // Table headers with proper spacing
@@ -960,7 +989,7 @@ fn generate_professional_bulk_pdf(staff_list: &[Staff]) -> Result<Vec<u8>, Strin
     let footer_text = format!("Document Generated: {} | Total Records: {} | Divisional Forest Office, Vavuniya | Confidential",
                              chrono::Utc::now().format("%d-%m-%Y"),
                              staff_list.len());
-    current_layer.use_text(footer_text, 8.0, margin_left, Mm(10.0), &font_regular);
+    current_layer.use_text(&footer_text, 8.0, margin_left, Mm(10.0), &font_regular);
 
     doc.save_to_bytes().map_err(|e| format!("Failed to generate PDF: {}", e))
 }
@@ -991,7 +1020,7 @@ fn add_official_field(
 
     // Calculate text width and wrap if necessary
     let max_value_width = Mm(100.0);
-    let wrapped_value = wrap_text(value, &font_regular, 10.0, max_value_width);
+    let wrapped_value = wrap_text(value, 10.0, max_value_width);
 
     let lines: Vec<&str> = wrapped_value.split('\n').collect();
 
@@ -1046,6 +1075,26 @@ fn draw_dotted_line(layer: &PdfLayerReference, x1: Mm, y1: Mm, x2: Mm, y2: Mm) {
     layer.add_line(line);
 }
 
+fn draw_rect(layer: &PdfLayerReference, x1: Mm, y1: Mm, x2: Mm, y2: Mm, thickness: f32) {
+    layer.set_outline_color(Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None)));
+    layer.set_outline_thickness(thickness);
+
+    let points = vec![
+        (Point::new(x1, y1), false),
+        (Point::new(x2, y1), false),
+        (Point::new(x2, y2), false),
+        (Point::new(x1, y2), false),
+        (Point::new(x1, y1), false),
+    ];
+
+    let rect = Line {
+        points,
+        is_closed: true,
+    };
+
+    layer.add_line(rect);
+}
+
 fn draw_table_header(layer: &PdfLayerReference, col_positions: &[Mm], y: Mm, font_bold: &IndirectFontRef) {
     let headers = ["#", "Appointment No.", "Full Name", "Designation", "Age", "NIC Number", "Contact", "Code", "Basic Salary"];
 
@@ -1085,7 +1134,13 @@ fn format_address_pdf(staff: &Staff) -> String {
     }
 }
 
-fn wrap_text(text: &str, _font: &IndirectFontRef, font_size: f32, max_width: Mm) -> String {
+fn calculate_text_width(text: &str, font_size: f32) -> Mm {
+    // Approximate calculation - each character is roughly 0.5 times font size in points
+    let approx_width = text.len() as f32 * font_size * 0.5;
+    Mm(approx_width * 0.3528) // Convert from points to mm
+}
+
+fn wrap_text(text: &str, font_size: f32, max_width: Mm) -> String {
     let words: Vec<&str> = text.split_whitespace().collect();
     let mut lines = Vec::new();
     let mut current_line = String::new();
@@ -1098,7 +1153,7 @@ fn wrap_text(text: &str, _font: &IndirectFontRef, font_size: f32, max_width: Mm)
         };
 
         // Estimate text width (this is approximate)
-        let estimated_width = Mm(test_line.len() as f32 * font_size * 0.5);
+        let estimated_width = calculate_text_width(&test_line, font_size);
 
         if estimated_width > max_width && !current_line.is_empty() {
             lines.push(current_line);
