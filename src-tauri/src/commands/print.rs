@@ -616,7 +616,7 @@ fn generate_bulk_staff_html(staff_list: &[Staff]) -> Result<String, String> {
                 <td style="text-align: center;">{}</td>
                 <td>{}</td>
                 <td>{}</td>
-                <td>{}</td>
+                <td style="word-wrap: break-word; max-width: 150px;">{}</td>
                 <td style="text-align: center;">{}</td>
                 <td>{}</td>
                 <td>{}</td>
@@ -627,7 +627,7 @@ fn generate_bulk_staff_html(staff_list: &[Staff]) -> Result<String, String> {
             index + 1,
             truncate_text(&staff.appointment_number, 15),
             truncate_text(&staff.full_name, 25),
-            truncate_text(&staff.designation, 20),
+            staff.designation, // No truncation for designation - display full text
             staff.age,
             truncate_text(&staff.nic_number, 12),
             truncate_text(&staff.contact_number.as_deref().unwrap_or("N/A"), 12),
@@ -712,7 +712,7 @@ fn generate_bulk_staff_html(staff_list: &[Staff]) -> Result<String, String> {
 
         th, td {{
             border: 1px solid #000;
-            padding: 3px;
+            padding: 4px;
             text-align: left;
             vertical-align: top;
         }}
@@ -758,8 +758,8 @@ fn generate_bulk_staff_html(staff_list: &[Staff]) -> Result<String, String> {
                 <tr>
                     <th style="width: 4%;">#</th>
                     <th style="width: 12%;">Appointment No.</th>
-                    <th style="width: 20%;">Full Name</th>
-                    <th style="width: 18%;">Designation</th>
+                    <th style="width: 18%;">Full Name</th>
+                    <th style="width: 20%;">Designation</th>
                     <th style="width: 5%;">Age</th>
                     <th style="width: 12%;">NIC Number</th>
                     <th style="width: 12%;">Contact</th>
@@ -1138,7 +1138,7 @@ fn generate_bulk_html_preview(staff_list: &[Staff]) -> String {
                 <td>{}</td>
                 <td>{}</td>
                 <td>{}</td>
-                <td>{}</td>
+                <td style="word-wrap: break-word;">{}</td>
                 <td>{}</td>
                 <td>{}</td>
                 <td>{}</td>
@@ -1149,7 +1149,7 @@ fn generate_bulk_html_preview(staff_list: &[Staff]) -> String {
             index + 1,
             staff.appointment_number,
             staff.full_name,
-            staff.designation,
+            staff.designation, // No truncation for designation in preview
             staff.age,
             staff.nic_number,
             staff.contact_number.as_deref().unwrap_or("N/A"),
@@ -1253,8 +1253,8 @@ fn generate_bulk_html_preview(staff_list: &[Staff]) -> String {
                 <tr>
                     <th style="width: 5%;">#</th>
                     <th style="width: 12%;">Appointment No.</th>
-                    <th style="width: 20%;">Full Name</th>
-                    <th style="width: 18%;">Designation</th>
+                    <th style="width: 18%;">Full Name</th>
+                    <th style="width: 20%;">Designation</th>
                     <th style="width: 6%;">Age</th>
                     <th style="width: 12%;">NIC Number</th>
                     <th style="width: 12%;">Contact</th>
