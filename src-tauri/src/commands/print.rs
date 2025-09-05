@@ -181,6 +181,33 @@ pub async fn print_staff_bulk(
     generate_bulk_staff_pdf(app_handle, staff_ids).await
 }
 
+fn format_number(value: f64, precision: usize) -> String {
+    let s = format!("{value:.precision$}");
+    let negative = value < 0.0;
+    let abs_s = if negative { &s[1..] } else { &s };
+    let parts: Vec<&str> = abs_s.split('.').collect();
+    let int_part = parts[0];
+    let dec_part = if parts.len() > 1 { parts[1] } else { "" };
+
+    let mut formatted_int = String::new();
+    let int_chars: Vec<char> = int_part.chars().collect();
+    let len = int_chars.len();
+    for (i, &c) in int_chars.iter().enumerate() {
+        formatted_int.push(c);
+        if (len - i - 1) % 3 == 0 && i < len - 1 {
+            formatted_int.push(',');
+        }
+    }
+
+    let mut result = if negative { "-".to_string() } else { String::new() };
+    result.push_str(&formatted_int);
+    if precision > 0 {
+        result.push('.');
+        result.push_str(dec_part);
+    }
+    result
+}
+
 fn generate_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String> {
     let (doc, page1, layer1) = PdfDocument::new("Staff Details", Mm(210.0), Mm(297.0), "Layer 1");
     let current_layer = doc.get_page(page1).get_layer(layer1);
@@ -190,71 +217,106 @@ fn generate_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String> {
     let font_bold = doc.add_builtin_font(BuiltinFont::HelveticaBold)
         .map_err(|e| format!("Failed to add bold font: {}", e))?;
 
-    let mut current_y = Mm(270.0);
-    let left_margin = Mm(20.0);
+    let mut current_y = Mm(280.0);
+    let left_margin = Mm(15.0);
+    let right_margin = Mm(195.0);
 
-    // Header section
-    current_layer.use_text("DIVISIONAL FOREST OFFICE", 18.0, Mm(50.0), current_y, &font_bold);
+    // Draw header box
+    let header_height = Mm(35.0);
+    draw_box(&current_layer, left_margin, current_y - header_height, right_margin - left_margin, header_height);
+
+    // Header section with better formatting
     current_y -= Mm(8.0);
-    current_layer.use_text("Vavuniya, Sri Lanka", 14.0, Mm(75.0), current_y, &font);
-    current_y -= Mm(8.0);
-    current_layer.use_text("STAFF INFORMATION SHEET", 16.0, Mm(60.0), current_y, &font_bold);
-    current_y -= Mm(20.0);
-
-    // Personal Information Section
-    current_layer.use_text("PERSONAL INFORMATION", 14.0, left_margin, current_y, &font_bold);
-    current_layer.use_text(&"=".repeat(50), 12.0, left_margin, current_y - Mm(3.0), &font);
-    current_y -= Mm(12.0);
-
-    let add_field = |label: &str, value: String, current_y: &mut Mm| {
-        let text = format!("{}: {}", label, value);
-        current_layer.use_text(text, 11.0, left_margin, *current_y, &font);
-        *current_y -= Mm(6.0);
-    };
-
-    add_field("Appointment Number", staff.appointment_number.clone(), &mut current_y);
-    add_field("Full Name", staff.full_name.clone(), &mut current_y);
-    add_field("Gender", staff.gender.clone(), &mut current_y);
-    add_field("Date of Birth", staff.date_of_birth.clone(), &mut current_y);
-    add_field("Age", format!("{} years", staff.age), &mut current_y);
-    add_field("NIC Number", staff.nic_number.clone(), &mut current_y);
-    add_field("Marital Status", staff.marital_status.clone(), &mut current_y);
-    add_field("Contact Number", staff.contact_number.clone().unwrap_or_else(|| "N/A".to_string()), &mut current_y);
-    add_field("Email", staff.email.clone().unwrap_or_else(|| "N/A".to_string()), &mut current_y);
-    add_field("Address", format_address(staff), &mut current_y);
-
+    current_layer.use_text("DIVISIONAL FOREST OFFICE", 20.0, Mm(45.0), current_y, &font_bold);
     current_y -= Mm(10.0);
+    current_layer.use_text("Vavuniya, Sri Lanka", 16.0, Mm(70.0), current_y, &font);
+    current_y -= Mm(12.0);
+    current_layer.use_text("STAFF INFORMATION SHEET", 18.0, Mm(55.0), current_y, &font_bold);
+    current_y -= Mm(15.0);
+
+    // Add some space after header
+    current_y -= Mm(10.0);
+
+    // Personal Information Section with better layout
+    draw_section_header(&current_layer, "PERSONAL INFORMATION", left_margin, &mut current_y, &font_bold);
+
+    let col1_x = left_margin + Mm(5.0);
+    let col2_x = Mm(110.0);
+    let field_spacing = Mm(10.0);
+
+    // Left column fields
+    let mut left_y = current_y;
+    add_field_enhanced(&current_layer, "Appointment Number", &staff.appointment_number, col1_x, &mut left_y, &font, &font_bold, field_spacing);
+    add_field_enhanced(&current_layer, "Full Name", &staff.full_name, col1_x, &mut left_y, &font, &font_bold, field_spacing);
+    add_field_enhanced(&current_layer, "Gender", &staff.gender, col1_x, &mut left_y, &font, &font_bold, field_spacing);
+    add_field_enhanced(&current_layer, "Date of Birth", &staff.date_of_birth, col1_x, &mut left_y, &font, &font_bold, field_spacing);
+    add_field_enhanced(&current_layer, "Age", &format!("{} years", staff.age), col1_x, &mut left_y, &font, &font_bold, field_spacing);
+
+    // Right column fields
+    let mut right_y = current_y;
+    add_field_enhanced(&current_layer, "NIC Number", &staff.nic_number, col2_x, &mut right_y, &font, &font_bold, field_spacing);
+    add_field_enhanced(&current_layer, "Marital Status", &staff.marital_status, col2_x, &mut right_y, &font, &font_bold, field_spacing);
+    add_field_enhanced(&current_layer, "Contact Number", &staff.contact_number.clone().unwrap_or_else(|| "N/A".to_string()), col2_x, &mut right_y, &font, &font_bold, field_spacing);
+    add_field_enhanced(&current_layer, "Email", &staff.email.clone().unwrap_or_else(|| "N/A".to_string()), col2_x, &mut right_y, &font, &font_bold, field_spacing);
+
+    // Use the lower y position for continuation
+    current_y = left_y.min(right_y) - Mm(5.0);
+
+    // Address field (full width)
+    add_field_enhanced(&current_layer, "Address", &format_address_enhanced(staff), col1_x, &mut current_y, &font, &font_bold, field_spacing);
+
+    current_y -= Mm(15.0);
 
     // Employment Details Section
-    current_layer.use_text("EMPLOYMENT DETAILS", 14.0, left_margin, current_y, &font_bold);
-    current_layer.use_text(&"=".repeat(50), 12.0, left_margin, current_y - Mm(3.0), &font);
-    current_y -= Mm(12.0);
+    draw_section_header(&current_layer, "EMPLOYMENT DETAILS", left_margin, &mut current_y, &font_bold);
 
-    add_field("Designation", staff.designation.clone(), &mut current_y);
-    add_field("Date of First Appointment", staff.date_of_first_appointment.clone(), &mut current_y);
-    add_field("Date of Retirement", staff.date_of_retirement.clone(), &mut current_y);
-    add_field("Increment Date", staff.increment_date.clone().unwrap_or_else(|| "N/A".to_string()), &mut current_y);
+    let mut emp_left_y = current_y;
+    let mut emp_right_y = current_y;
 
-    current_y -= Mm(10.0);
+    // Left column
+    add_field_enhanced(&current_layer, "Designation", &staff.designation, col1_x, &mut emp_left_y, &font, &font_bold, field_spacing);
+    add_field_enhanced(&current_layer, "Date of First Appointment", &staff.date_of_first_appointment, col1_x, &mut emp_left_y, &font, &font_bold, field_spacing);
+
+    // Right column
+    add_field_enhanced(&current_layer, "Date of Retirement", &staff.date_of_retirement, col2_x, &mut emp_right_y, &font, &font_bold, field_spacing);
+    add_field_enhanced(&current_layer, "Increment Date", &staff.increment_date.clone().unwrap_or_else(|| "N/A".to_string()), col2_x, &mut emp_right_y, &font, &font_bold, field_spacing);
+
+    current_y = emp_left_y.min(emp_right_y) - Mm(15.0);
 
     // Salary Information Section
-    current_layer.use_text("SALARY INFORMATION", 14.0, left_margin, current_y, &font_bold);
-    current_layer.use_text(&"=".repeat(50), 12.0, left_margin, current_y - Mm(3.0), &font);
-    current_y -= Mm(12.0);
+    draw_section_header(&current_layer, "SALARY INFORMATION", left_margin, &mut current_y, &font_bold);
 
-    add_field("Salary Code", staff.salary_code.clone(), &mut current_y);
-    add_field("Basic Salary", format!("Rs. {:.2}", staff.basic_salary), &mut current_y);
-    add_field("Increment Amount", format!("Rs. {:.2}", staff.increment_amount), &mut current_y);
+    let mut sal_left_y = current_y;
+    let mut sal_right_y = current_y;
 
-    current_y -= Mm(3.0);
-    let total_text = format!("TOTAL SALARY: Rs. {:.2}", staff.basic_salary + staff.increment_amount);
-    current_layer.use_text(total_text, 12.0, left_margin, current_y, &font_bold);
+    // Left column
+    add_field_enhanced(&current_layer, "Salary Code", &staff.salary_code, col1_x, &mut sal_left_y, &font, &font_bold, field_spacing);
+    add_field_enhanced(&current_layer, "Basic Salary", &format!("Rs. {}", format_number(staff.basic_salary, 2)), col1_x, &mut sal_left_y, &font, &font_bold, field_spacing);
 
-    // Footer
-    current_y = Mm(25.0);
-    let footer_text = format!("Generated on: {} | Divisional Forest Office, Vavuniya",
-                             chrono::Utc::now().format("%Y-%m-%d %H:%M UTC"));
-    current_layer.use_text(footer_text, 8.0, left_margin, current_y, &font);
+    // Right column
+    add_field_enhanced(&current_layer, "Increment Amount", &format!("Rs. {}", format_number(staff.increment_amount, 2)), col2_x, &mut sal_right_y, &font, &font_bold, field_spacing);
+
+    current_y = sal_left_y.min(sal_right_y) - Mm(10.0);
+
+    // Total salary highlight box
+    let total_salary = staff.basic_salary + staff.increment_amount;
+    let total_text = format!("TOTAL SALARY: Rs. {}", format_number(total_salary, 2));
+
+    // Draw highlight box for total
+    let box_height = Mm(12.0);
+    let box_width = right_margin - left_margin - Mm(10.0);
+    draw_highlight_box(&current_layer, left_margin + Mm(5.0), current_y - box_height, box_width, box_height);
+
+    current_y -= Mm(8.0);
+    current_layer.use_text(total_text, 14.0, left_margin + Mm(15.0), current_y, &font_bold);
+
+    // Footer with better spacing
+    current_y = Mm(30.0);
+    draw_line(&current_layer, left_margin, current_y + Mm(5.0), right_margin, current_y + Mm(5.0));
+
+    let footer_text = format!("Generated on: {} | Divisional Forest Office, Vavuniya, Sri Lanka",
+                             chrono::Utc::now().format("%Y-%m-%d at %H:%M UTC"));
+    current_layer.use_text(footer_text, 10.0, left_margin, current_y, &font);
 
     doc.save_to_bytes().map_err(|e| format!("Failed to generate PDF: {}", e))
 }
@@ -268,97 +330,248 @@ fn generate_bulk_pdf(staff_list: &[Staff]) -> Result<Vec<u8>, String> {
     let font_bold = doc.add_builtin_font(BuiltinFont::HelveticaBold)
         .map_err(|e| format!("Failed to add bold font: {}", e))?;
 
-    let mut current_y = Mm(190.0);
-    let left_margin = Mm(15.0);
+    let mut current_y = Mm(195.0);
+    let left_margin = Mm(10.0);
 
-    // Header
-    current_layer.use_text("DIVISIONAL FOREST OFFICE - STAFF DIRECTORY", 16.0, Mm(70.0), current_y, &font_bold);
+    // Header with better formatting
+    current_layer.use_text("DIVISIONAL FOREST OFFICE - STAFF DIRECTORY", 18.0, Mm(60.0), current_y, &font_bold);
+    current_y -= Mm(10.0);
+    current_layer.use_text("Vavuniya, Sri Lanka", 14.0, Mm(110.0), current_y, &font);
     current_y -= Mm(8.0);
-    current_layer.use_text("Vavuniya, Sri Lanka", 12.0, Mm(115.0), current_y, &font);
-    current_y -= Mm(12.0);
 
     let header_info = format!("Total Staff: {} | Generated: {}",
                              staff_list.len(),
-                             chrono::Utc::now().format("%Y-%m-%d %H:%M"));
-    current_layer.use_text(header_info, 10.0, Mm(90.0), current_y, &font);
+                             chrono::Utc::now().format("%Y-%m-%d at %H:%M"));
+    current_layer.use_text(header_info, 12.0, Mm(85.0), current_y, &font);
     current_y -= Mm(15.0);
 
-    // Table headers
-    current_layer.use_text("#", 9.0, Mm(15.0), current_y, &font_bold);
-    current_layer.use_text("Appointment No.", 9.0, Mm(25.0), current_y, &font_bold);
-    current_layer.use_text("Full Name", 9.0, Mm(60.0), current_y, &font_bold);
-    current_layer.use_text("Designation", 9.0, Mm(105.0), current_y, &font_bold);
-    current_layer.use_text("Age", 9.0, Mm(145.0), current_y, &font_bold);
-    current_layer.use_text("NIC Number", 9.0, Mm(160.0), current_y, &font_bold);
-    current_layer.use_text("Contact", 9.0, Mm(200.0), current_y, &font_bold);
-    current_layer.use_text("Salary Code", 9.0, Mm(235.0), current_y, &font_bold);
-    current_layer.use_text("Basic Salary", 9.0, Mm(260.0), current_y, &font_bold);
+    // Draw table header with background
+    let header_height = Mm(8.0);
+    draw_highlight_box(&current_layer, left_margin, current_y - header_height, Mm(277.0), header_height);
 
-    current_y -= Mm(4.0);
-    current_layer.use_text(&"=".repeat(100), 8.0, left_margin, current_y, &font);
-    current_y -= Mm(8.0);
+    // Table headers with better spacing
+    current_layer.use_text("#", 10.0, Mm(15.0), current_y - Mm(5.0), &font_bold);
+    current_layer.use_text("Appointment No.", 10.0, Mm(25.0), current_y - Mm(5.0), &font_bold);
+    current_layer.use_text("Full Name", 10.0, Mm(60.0), current_y - Mm(5.0), &font_bold);
+    current_layer.use_text("Designation", 10.0, Mm(105.0), current_y - Mm(5.0), &font_bold);
+    current_layer.use_text("Age", 10.0, Mm(150.0), current_y - Mm(5.0), &font_bold);
+    current_layer.use_text("NIC Number", 10.0, Mm(165.0), current_y - Mm(5.0), &font_bold);
+    current_layer.use_text("Contact", 10.0, Mm(210.0), current_y - Mm(5.0), &font_bold);
+    current_layer.use_text("Salary Code", 10.0, Mm(245.0), current_y - Mm(5.0), &font_bold);
+    current_layer.use_text("Basic Salary", 10.0, Mm(270.0), current_y - Mm(5.0), &font_bold);
+
+    current_y -= Mm(12.0);
 
     let mut page_num = 1;
-    let rows_per_page = 18;
+    let rows_per_page = 16;
     let mut row_count = 0;
 
     for (index, staff) in staff_list.iter().enumerate() {
-        if current_y < Mm(30.0) || (row_count > 0 && row_count % rows_per_page == 0) {
+        if current_y < Mm(25.0) || (row_count > 0 && row_count % rows_per_page == 0) {
             // Add new page
             let (page_id, layer_id) = doc.add_page(Mm(297.0), Mm(210.0), &format!("Layer {}", page_num + 1));
             current_layer = doc.get_page(page_id).get_layer(layer_id);
-            current_y = Mm(180.0);
+            current_y = Mm(185.0);
             page_num += 1;
 
             // Re-add headers on new page
-            current_layer.use_text("STAFF DIRECTORY (Continued)", 14.0, Mm(90.0), current_y, &font_bold);
+            current_layer.use_text("STAFF DIRECTORY (Continued)", 16.0, Mm(100.0), current_y, &font_bold);
+            current_y -= Mm(15.0);
+
+            // Re-draw table header
+            draw_highlight_box(&current_layer, left_margin, current_y - header_height, Mm(277.0), header_height);
+
+            current_layer.use_text("#", 10.0, Mm(15.0), current_y - Mm(5.0), &font_bold);
+            current_layer.use_text("Appointment No.", 10.0, Mm(25.0), current_y - Mm(5.0), &font_bold);
+            current_layer.use_text("Full Name", 10.0, Mm(60.0), current_y - Mm(5.0), &font_bold);
+            current_layer.use_text("Designation", 10.0, Mm(105.0), current_y - Mm(5.0), &font_bold);
+            current_layer.use_text("Age", 10.0, Mm(150.0), current_y - Mm(5.0), &font_bold);
+            current_layer.use_text("NIC Number", 10.0, Mm(165.0), current_y - Mm(5.0), &font_bold);
+            current_layer.use_text("Contact", 10.0, Mm(210.0), current_y - Mm(5.0), &font_bold);
+            current_layer.use_text("Salary Code", 10.0, Mm(245.0), current_y - Mm(5.0), &font_bold);
+            current_layer.use_text("Basic Salary", 10.0, Mm(270.0), current_y - Mm(5.0), &font_bold);
+
             current_y -= Mm(12.0);
-
-            current_layer.use_text("#", 9.0, Mm(15.0), current_y, &font_bold);
-            current_layer.use_text("Appointment No.", 9.0, Mm(25.0), current_y, &font_bold);
-            current_layer.use_text("Full Name", 9.0, Mm(60.0), current_y, &font_bold);
-            current_layer.use_text("Designation", 9.0, Mm(105.0), current_y, &font_bold);
-            current_layer.use_text("Age", 9.0, Mm(145.0), current_y, &font_bold);
-            current_layer.use_text("NIC Number", 9.0, Mm(160.0), current_y, &font_bold);
-            current_layer.use_text("Contact", 9.0, Mm(200.0), current_y, &font_bold);
-            current_layer.use_text("Salary Code", 9.0, Mm(235.0), current_y, &font_bold);
-            current_layer.use_text("Basic Salary", 9.0, Mm(260.0), current_y, &font_bold);
-
-            current_y -= Mm(4.0);
-            current_layer.use_text(&"=".repeat(100), 8.0, left_margin, current_y, &font);
-            current_y -= Mm(8.0);
         }
 
-        // Add row data
-        current_layer.use_text((index + 1).to_string(), 8.0, Mm(15.0), current_y, &font);
-        current_layer.use_text(truncate_text(&staff.appointment_number, 15), 8.0, Mm(25.0), current_y, &font);
-        current_layer.use_text(truncate_text(&staff.full_name, 20), 8.0, Mm(60.0), current_y, &font);
-        current_layer.use_text(truncate_text(&staff.designation, 18), 8.0, Mm(105.0), current_y, &font);
-        current_layer.use_text(staff.age.to_string(), 8.0, Mm(145.0), current_y, &font);
-        current_layer.use_text(truncate_text(&staff.nic_number, 15), 8.0, Mm(160.0), current_y, &font);
-        current_layer.use_text(truncate_text(&staff.contact_number.as_deref().unwrap_or("N/A"), 12), 8.0, Mm(200.0), current_y, &font);
-        current_layer.use_text(staff.salary_code.clone(), 8.0, Mm(235.0), current_y, &font);
-        current_layer.use_text(format!("Rs. {:.0}", staff.basic_salary), 8.0, Mm(260.0), current_y, &font);
+        // Add row data with better formatting
+        let row_color = if index % 2 == 0 { Some(0.95f32) } else { None };
+        if let Some(gray) = row_color {
+            draw_gray_box(&current_layer, left_margin, current_y - Mm(6.0), Mm(277.0), Mm(6.0), gray);
+        }
 
-        current_y -= Mm(6.0);
+        current_layer.use_text((index + 1).to_string(), 9.0, Mm(15.0), current_y, &font);
+        current_layer.use_text(truncate_text(&staff.appointment_number, 18), 9.0, Mm(25.0), current_y, &font);
+        current_layer.use_text(truncate_text(&staff.full_name, 22), 9.0, Mm(60.0), current_y, &font);
+        current_layer.use_text(truncate_text(&staff.designation, 20), 9.0, Mm(105.0), current_y, &font);
+        current_layer.use_text(staff.age.to_string(), 9.0, Mm(150.0), current_y, &font);
+        current_layer.use_text(truncate_text(&staff.nic_number, 15), 9.0, Mm(165.0), current_y, &font);
+        current_layer.use_text(truncate_text(&staff.contact_number.as_deref().unwrap_or("N/A"), 12), 9.0, Mm(210.0), current_y, &font);
+        current_layer.use_text(staff.salary_code.clone(), 9.0, Mm(245.0), current_y, &font);
+        current_layer.use_text(format!("Rs. {}", format_number(staff.basic_salary, 0)), 8.0, Mm(265.0), current_y, &font);
+
+        current_y -= Mm(8.0);
         row_count += 1;
 
-        // Add separator every 5 rows
+        // Add separator line every 5 rows
         if row_count % 5 == 0 {
-            current_layer.use_text(&"-".repeat(100), 6.0, left_margin, current_y, &font);
-            current_y -= Mm(2.0);
+            draw_line(&current_layer, left_margin, current_y + Mm(1.0), left_margin + Mm(277.0), current_y + Mm(1.0));
         }
     }
 
     // Footer
-    let footer_text = format!("Page {} | Total Records: {} | Generated: {} | Divisional Forest Office, Vavuniya",
-                             page_num, staff_list.len(), chrono::Utc::now().format("%Y-%m-%d %H:%M UTC"));
-    current_layer.use_text(footer_text, 7.0, left_margin, Mm(15.0), &font);
+    let footer_text = format!("Page {} of {} | Total Records: {} | Generated: {} | Divisional Forest Office, Vavuniya",
+                             page_num, page_num, staff_list.len(), chrono::Utc::now().format("%Y-%m-%d at %H:%M UTC"));
+    current_layer.use_text(footer_text, 8.0, left_margin, Mm(10.0), &font);
 
     doc.save_to_bytes().map_err(|e| format!("Failed to generate PDF: {}", e))
 }
 
-fn format_address(staff: &Staff) -> String {
+// Helper functions for better PDF formatting
+
+fn draw_box(layer: &PdfLayerReference, x: Mm, y: Mm, width: Mm, height: Mm) {
+    layer.set_outline_color(Color::Rgb(Rgb::new(0.0f32, 0.0f32, 0.0f32, None)));
+    layer.set_outline_thickness(1.0);
+
+    let points = vec![
+        (Point::new(x, y + height), false),
+        (Point::new(x + width, y + height), false),
+        (Point::new(x + width, y), false),
+        (Point::new(x, y), false),
+    ];
+
+    let line = Line {
+        points,
+        is_closed: true,
+    };
+
+    layer.add_line(line);
+}
+
+fn draw_highlight_box(layer: &PdfLayerReference, x: Mm, y: Mm, width: Mm, height: Mm) {
+    layer.set_fill_color(Color::Rgb(Rgb::new(0.9f32, 0.9f32, 0.9f32, None)));
+    layer.set_outline_color(Color::Rgb(Rgb::new(0.0f32, 0.0f32, 0.0f32, None)));
+    layer.set_outline_thickness(1.0);
+
+    let points = vec![
+        (Point::new(x, y + height), false),
+        (Point::new(x + width, y + height), false),
+        (Point::new(x + width, y), false),
+        (Point::new(x, y), false),
+    ];
+
+    let line = Line {
+        points,
+        is_closed: true,
+    };
+
+    layer.add_line(line);
+}
+
+fn draw_gray_box(layer: &PdfLayerReference, x: Mm, y: Mm, width: Mm, height: Mm, gray_level: f32) {
+    layer.set_fill_color(Color::Rgb(Rgb::new(gray_level, gray_level, gray_level, None)));
+    layer.set_outline_color(Color::Rgb(Rgb::new(0.0f32, 0.0f32, 0.0f32, None)));
+    layer.set_outline_thickness(0.0);
+
+    let points = vec![
+        (Point::new(x, y + height), false),
+        (Point::new(x + width, y + height), false),
+        (Point::new(x + width, y), false),
+        (Point::new(x, y), false),
+    ];
+
+    let line = Line {
+        points,
+        is_closed: true,
+    };
+
+    layer.add_line(line);
+}
+
+fn draw_line(layer: &PdfLayerReference, x1: Mm, y1: Mm, x2: Mm, y2: Mm) {
+    layer.set_outline_color(Color::Rgb(Rgb::new(0.0f32, 0.0f32, 0.0f32, None)));
+    layer.set_outline_thickness(1.0);
+
+    let points = vec![
+        (Point::new(x1, y1), false),
+        (Point::new(x2, y2), false),
+    ];
+
+    let line = Line {
+        points,
+        is_closed: false,
+    };
+
+    layer.add_line(line);
+}
+
+fn draw_section_header(layer: &PdfLayerReference, title: &str, left_margin: Mm, current_y: &mut Mm, font_bold: &IndirectFontRef) {
+    // Draw section background
+    let section_height = Mm(10.0);
+    draw_highlight_box(layer, left_margin, *current_y - section_height, Mm(180.0), section_height);
+
+    *current_y -= Mm(7.0);
+    layer.use_text(title, 14.0, left_margin + Mm(5.0), *current_y, font_bold);
+    *current_y -= Mm(8.0);
+}
+
+fn add_field_enhanced(
+    layer: &PdfLayerReference,
+    label: &str,
+    value: &str,
+    x: Mm,
+    y: &mut Mm,
+    font: &IndirectFontRef,
+    font_bold: &IndirectFontRef,
+    spacing: Mm,
+) {
+    layer.use_text(format!("{}:", label), 12.0, x, *y, font_bold);
+    *y -= Mm(4.0);
+
+    // Wrap long text if needed
+    let wrapped_value = wrap_text(value, 45);
+    for line in wrapped_value.lines() {
+        layer.use_text(line, 11.0, x + Mm(3.0), *y, font);
+        *y -= Mm(4.0);
+    }
+
+    *y -= spacing - Mm(4.0);
+}
+
+fn wrap_text(text: &str, max_chars: usize) -> String {
+    if text.len() <= max_chars {
+        return text.to_string();
+    }
+
+    let mut result = String::new();
+    let mut current_line = String::new();
+
+    for word in text.split_whitespace() {
+        if current_line.len() + word.len() + 1 <= max_chars {
+            if !current_line.is_empty() {
+                current_line.push(' ');
+            }
+            current_line.push_str(word);
+        } else {
+            if !result.is_empty() {
+                result.push('\n');
+            }
+            result.push_str(&current_line);
+            current_line = word.to_string();
+        }
+    }
+
+    if !current_line.is_empty() {
+        if !result.is_empty() {
+            result.push('\n');
+        }
+        result.push_str(&current_line);
+    }
+
+    result
+}
+
+fn format_address_enhanced(staff: &Staff) -> String {
     let mut address_parts = Vec::new();
 
     if let Some(line1) = &staff.address_line1 {
