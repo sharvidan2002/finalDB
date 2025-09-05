@@ -240,7 +240,6 @@ fn format_date(date_str: &str) -> String {
 
 fn generate_staff_html_preview(staff: &Staff) -> String {
     let address = format_address_html(staff);
-    let total_salary = staff.basic_salary + staff.increment_amount;
     let current_date = chrono::Utc::now().format("%d-%m-%Y").to_string();
 
     format!(r#"
@@ -270,13 +269,6 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
             border-bottom: 3px double #000;
             padding-bottom: 15px;
             margin-bottom: 25px;
-        }}
-        .logo-area {{
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 10px;
         }}
         .org-title {{
             font-size: 20px;
@@ -313,27 +305,6 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
             border-bottom: 2px solid #000;
             padding-bottom: 5px;
             margin-bottom: 15px;
-        }}
-        .photo-section {{
-            float: right;
-            margin: 0 0 20px 20px;
-            text-align: center;
-        }}
-        .photo-placeholder {{
-            width: 120px;
-            height: 150px;
-            border: 2px solid #000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: #f5f5f5;
-            font-size: 12px;
-        }}
-        .photo {{
-            width: 120px;
-            height: 150px;
-            border: 2px solid #000;
-            object-fit: cover;
         }}
         .field-row {{
             display: table;
@@ -383,15 +354,6 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
         .clearfix {{
             clear: both;
         }}
-        .total-salary {{
-            background: #f0f0f0;
-            border: 2px solid #000;
-            padding: 10px;
-            margin: 15px 0;
-            text-align: center;
-            font-size: 16px;
-            font-weight: bold;
-        }}
         @media print {{
             body {{ margin: 0; padding: 0; }}
             .document {{ margin: 0; box-shadow: none; }}
@@ -401,11 +363,6 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
 <body>
     <div class="document">
         <div class="header">
-            <div class="logo-area">
-                <div style="width: 50px; height: 50px; border: 2px solid #000; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold;">
-                    LOGO
-                </div>
-            </div>
             <div class="org-title">Government of Sri Lanka</div>
             <div class="org-subtitle">Ministry of Environment and Natural Resources</div>
             <div class="org-subtitle">Divisional Forest Office</div>
@@ -414,10 +371,6 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
         </div>
 
         <div class="content">
-            <div class="photo-section">
-                {}
-            </div>
-
             <div class="section">
                 <div class="section-title">Personal Information</div>
 
@@ -472,8 +425,6 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
                 </div>
             </div>
 
-            <div class="clearfix"></div>
-
             <div class="section">
                 <div class="section-title">Employment Details</div>
 
@@ -515,10 +466,6 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
                     <div class="field-label">Increment Amount:</div>
                     <div class="field-value">{}</div>
                 </div>
-
-                <div class="total-salary">
-                    TOTAL MONTHLY SALARY: {}
-                </div>
             </div>
 
             <div class="signature-section">
@@ -547,11 +494,6 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
 </html>
     "#,
         staff.full_name,
-        if staff.image_data.is_some() {
-            format!(r#"<img src="data:image/jpeg;base64,{}" class="photo">"#, staff.image_data.as_ref().unwrap())
-        } else {
-            r#"<div class="photo-placeholder">STAFF PHOTO</div>"#.to_string()
-        },
         staff.appointment_number,
         staff.full_name,
         staff.gender,
@@ -569,7 +511,6 @@ fn generate_staff_html_preview(staff: &Staff) -> String {
         staff.salary_code,
         format_currency(staff.basic_salary),
         format_currency(staff.increment_amount),
-        format_currency(total_salary),
         current_date,
         staff.appointment_number
     )
@@ -762,22 +703,40 @@ fn format_address_html(staff: &Staff) -> String {
 
 fn generate_professional_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String> {
     let (doc, page1, layer1) = PdfDocument::new("Official Staff Record", Mm(210.0), Mm(297.0), "Layer 1");
-    let current_layer = doc.get_page(page1).get_layer(layer1);
+    let mut current_layer = doc.get_page(page1).get_layer(layer1);
+    let mut current_page = 1;
 
     let font_regular = doc.add_builtin_font(BuiltinFont::TimesRoman)
         .map_err(|e| format!("Failed to add font: {}", e))?;
     let font_bold = doc.add_builtin_font(BuiltinFont::TimesBold)
         .map_err(|e| format!("Failed to add bold font: {}", e))?;
 
-    let margin_left = Mm(25.0);
-    let margin_right = Mm(185.0);
-    let mut current_y = Mm(272.0);
+    let margin_left = Mm(20.0);
+    let margin_right = Mm(190.0);
+    let mut current_y = Mm(277.0); // Start with top margin
 
     // Official colors
     let black = Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None));
     let dark_blue = Color::Rgb(Rgb::new(0.1, 0.2, 0.4, None));
 
-    // Official Header with Logo Area
+    // Check if we need a new page
+    let check_new_page = |y: &mut Mm, page: &mut i32, layer: &mut PdfLayerReference, doc: &PdfDocumentReference| -> Result<(), String> {
+        if *y < Mm(30.0) {
+            // Add new page
+            let (new_page, new_layer) = doc.add_page(Mm(210.0), Mm(297.0), &format!("Layer {}", *page + 1));
+            *layer = doc.get_page(new_page).get_layer(new_layer);
+            *page += 1;
+            *y = Mm(277.0); // Reset to top of new page
+
+            // Re-add header on new page
+            layer.set_fill_color(black.clone());
+            layer.use_text("OFFICIAL STAFF RECORD (Continued)", 14.0, margin_left + Mm(25.0), *y, &font_bold);
+            *y -= Mm(15.0);
+        }
+        Ok(())
+    };
+
+    // Official Header (without logo)
     current_layer.set_fill_color(black.clone());
 
     // Government header
@@ -806,48 +765,82 @@ fn generate_professional_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String
 
     // Personal Information Section
     add_section_header(&current_layer, "PERSONAL INFORMATION", margin_left, &mut current_y, &font_bold);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
 
     add_official_field(&current_layer, "Appointment Number:", &staff.appointment_number, margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Full Name:", &staff.full_name, margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Gender:", &staff.gender, margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Date of Birth:", &format_date(&staff.date_of_birth), margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Age:", &format!("{} years", staff.age), margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "NIC Number:", &staff.nic_number, margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Marital Status:", &staff.marital_status, margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Address:", &format_address_pdf(staff), margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Contact Number:", &staff.contact_number.clone().unwrap_or_else(|| "Not provided".to_string()), margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Email:", &staff.email.clone().unwrap_or_else(|| "Not provided".to_string()), margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
 
     current_y -= Mm(10.0);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
 
     // Employment Details Section
     add_section_header(&current_layer, "EMPLOYMENT DETAILS", margin_left, &mut current_y, &font_bold);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
 
     add_official_field(&current_layer, "Designation:", &staff.designation, margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Date of First Appointment:", &format_date(&staff.date_of_first_appointment), margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Date of Retirement:", &format_date(&staff.date_of_retirement), margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Increment Date:", &staff.increment_date.clone().unwrap_or_else(|| "Not specified".to_string()), margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
 
     current_y -= Mm(10.0);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
 
     // Salary Information Section
     add_section_header(&current_layer, "SALARY INFORMATION", margin_left, &mut current_y, &font_bold);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
 
     add_official_field(&current_layer, "Salary Code:", &staff.salary_code, margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Basic Salary:", &format_currency(staff.basic_salary), margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+
     add_official_field(&current_layer, "Increment Amount:", &format_currency(staff.increment_amount), margin_left, &mut current_y, &font_bold, &font_regular);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
 
-    current_y -= Mm(8.0);
+    current_y -= Mm(20.0);
+    check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
 
-    // Total salary in box
-    let total_salary = staff.basic_salary + staff.increment_amount;
-    draw_rectangle(&current_layer, margin_left, current_y - Mm(5.0), Mm(135.0), Mm(15.0));
-    current_layer.use_text("TOTAL MONTHLY SALARY:", 12.0, margin_left + Mm(5.0), current_y, &font_bold);
-    current_layer.use_text(format_currency(total_salary), 12.0, margin_left + Mm(80.0), current_y, &font_bold);
+    // Signature section - ensure we have enough space
+    if current_y < Mm(40.0) {
+        check_new_page(&mut current_y, &mut current_page, &mut current_layer, &doc)?;
+        current_y = Mm(277.0); // Start at top of new page for signatures
+    }
 
-    current_y -= Mm(25.0);
-
-    // Signature section
     current_layer.use_text("Staff Member Signature:", 10.0, margin_left, current_y, &font_regular);
     draw_line(&current_layer, margin_left + Mm(40.0), current_y - Mm(2.0), margin_left + Mm(80.0), current_y - Mm(2.0), 1.0f32);
 
@@ -857,18 +850,26 @@ fn generate_professional_individual_pdf(staff: &Staff) -> Result<Vec<u8>, String
     current_y -= Mm(8.0);
     current_layer.use_text("Divisional Forest Office", 9.0, margin_left + Mm(130.0), current_y, &font_regular);
 
-    // Footer
-    current_y = Mm(25.0);
-    draw_line(&current_layer, margin_left, current_y + Mm(5.0), margin_right, current_y + Mm(5.0), 1.0f32);
+    // Footer - place at bottom of the last page
+    let footer_y = if current_page > 1 {
+        // For multi-page documents, put footer on last page
+        Mm(15.0)
+    } else {
+        // For single page, use calculated position but ensure it's not too low
+        std::cmp::min(current_y - Mm(10.0), Mm(15.0))
+    };
 
-    let footer_text = format!("Document Generated: {} | Reference: {} | Divisional Forest Office, Vavuniya | Official Use Only",
+    draw_line(&current_layer, margin_left, footer_y + Mm(5.0), margin_right, footer_y + Mm(5.0), 1.0f32);
+
+    let footer_text = format!("Document Generated: {} | Reference: {} | Divisional Forest Office, Vavuniya | Official Use Only | Page {} of {}",
                              chrono::Utc::now().format("%d-%m-%Y"),
-                             staff.appointment_number);
-    current_layer.use_text(footer_text, 8.0, margin_left, current_y, &font_regular);
+                             staff.appointment_number,
+                             current_page,
+                             current_page);
+    current_layer.use_text(footer_text, 8.0, margin_left, footer_y, &font_regular);
 
     doc.save_to_bytes().map_err(|e| format!("Failed to generate PDF: {}", e))
 }
-
 fn generate_professional_bulk_pdf(staff_list: &[Staff]) -> Result<Vec<u8>, String> {
     let (doc, page1, layer1) = PdfDocument::new("Official Staff Directory", Mm(297.0), Mm(210.0), "Layer 1");
     let mut current_layer = doc.get_page(page1).get_layer(layer1);
@@ -884,7 +885,7 @@ fn generate_professional_bulk_pdf(staff_list: &[Staff]) -> Result<Vec<u8>, Strin
 
     let black = Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None));
 
-    // Official Header
+    // Official Header (without logo)
     current_layer.set_fill_color(black.clone());
     current_layer.use_text("GOVERNMENT OF SRI LANKA - DIVISIONAL FOREST OFFICE", 16.0, Mm(60.0), current_y, &font_bold);
     current_y -= Mm(8.0);
@@ -974,7 +975,7 @@ fn add_section_header(
 ) {
     layer.use_text(title, 12.0, x, *y, font_bold);
     draw_line(layer, x, *y - Mm(2.0), x + Mm(135.0), *y - Mm(2.0), 1.5f32);
-    *y -= Mm(12.0);
+    *y -= Mm(15.0); // Increased from 12.0 for better spacing
 }
 
 fn add_official_field(
@@ -987,12 +988,28 @@ fn add_official_field(
     font_regular: &IndirectFontRef,
 ) {
     layer.use_text(label, 10.0, x, *y, font_bold);
-    layer.use_text(value, 10.0, x + Mm(50.0), *y, font_regular);
 
-    // Draw dotted line
-    draw_dotted_line(layer, x + Mm(48.0), *y - Mm(1.0), x + Mm(135.0), *y - Mm(1.0));
+    // Calculate text width and wrap if necessary
+    let max_value_width = Mm(100.0);
+    let wrapped_value = wrap_text(value, &font_regular, 10.0, max_value_width);
 
-    *y -= Mm(8.0);
+    let lines: Vec<&str> = wrapped_value.split('\n').collect();
+
+    for (i, line) in lines.iter().enumerate() {
+        if i == 0 {
+            layer.use_text(*line, 10.0, x + Mm(50.0), *y, font_regular);
+        } else {
+            *y -= Mm(5.0);
+            layer.use_text(*line, 10.0, x + Mm(50.0), *y, font_regular);
+        }
+
+        // Draw dotted line only for the first line
+        if i == 0 {
+            draw_dotted_line(layer, x + Mm(48.0), *y - Mm(1.0), x + Mm(135.0), *y - Mm(1.0));
+        }
+    }
+
+    *y -= Mm(6.0 + (lines.len() as f32 - 1.0) * 5.0);
 }
 
 fn draw_line(layer: &PdfLayerReference, x1: Mm, y1: Mm, x2: Mm, y2: Mm, thickness: f32) {
@@ -1024,25 +1041,6 @@ fn draw_dotted_line(layer: &PdfLayerReference, x1: Mm, y1: Mm, x2: Mm, y2: Mm) {
     let line = Line {
         points,
         is_closed: false,
-    };
-
-    layer.add_line(line);
-}
-
-fn draw_rectangle(layer: &PdfLayerReference, x: Mm, y: Mm, width: Mm, height: Mm) {
-    layer.set_outline_color(Color::Rgb(Rgb::new(0.0, 0.0, 0.0, None)));
-    layer.set_outline_thickness(1.0f32);
-
-    let points = vec![
-        (Point::new(x, y), false),
-        (Point::new(x + width, y), false),
-        (Point::new(x + width, y + height), false),
-        (Point::new(x, y + height), false),
-    ];
-
-    let line = Line {
-        points,
-        is_closed: true,
     };
 
     layer.add_line(line);
@@ -1085,6 +1083,36 @@ fn format_address_pdf(staff: &Staff) -> String {
     } else {
         address_parts.join(", ")
     }
+}
+
+fn wrap_text(text: &str, _font: &IndirectFontRef, font_size: f32, max_width: Mm) -> String {
+    let words: Vec<&str> = text.split_whitespace().collect();
+    let mut lines = Vec::new();
+    let mut current_line = String::new();
+
+    for word in words {
+        let test_line = if current_line.is_empty() {
+            word.to_string()
+        } else {
+            format!("{} {}", current_line, word)
+        };
+
+        // Estimate text width (this is approximate)
+        let estimated_width = Mm(test_line.len() as f32 * font_size * 0.5);
+
+        if estimated_width > max_width && !current_line.is_empty() {
+            lines.push(current_line);
+            current_line = word.to_string();
+        } else {
+            current_line = test_line;
+        }
+    }
+
+    if !current_line.is_empty() {
+        lines.push(current_line);
+    }
+
+    lines.join("\n")
 }
 
 fn truncate_text(text: &str, max_length: usize) -> String {
