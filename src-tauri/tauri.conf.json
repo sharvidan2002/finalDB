@@ -46,9 +46,8 @@
   },
   "plugins": {
     "fs": {
-      "scope": ["**"]
+      "requireLiteralLeadingDot": false
     },
-    "dialog": {},
     "shell": {
       "open": true
     }
