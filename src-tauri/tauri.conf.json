@@ -1,65 +1,24 @@
 {
-  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/1.x/tooling/cli/schema.json",
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "com.forestoffice.staffmanagement",
+  "productName": "Forest Office Staff Management",
+  "version": "1.0.0",
   "build": {
-    "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
-    "devPath": "http://localhost:1420",
-    "distDir": "../dist"
+    "beforeDevCommand": "npm run dev",
+    "frontendDist": "../dist",
+    "devUrl": "http://localhost:1420"
   },
-  "package": {
-    "productName": "Forest Office Staff Management",
-    "version": "1.0.0"
-  },
-  "tauri": {
-    "allowlist": {
-      "shell": {
-        "open": true
-      },
-      "dialog": {
-        "open": true,
-        "save": true
-      },
-      "fs": {
-        "readFile": true,
-        "writeFile": true,
-        "createDir": true,
-        "exists": true
-      },
-      "path": {
-        "all": true
-      },
-      "window": {
-        "close": true,
-        "hide": true,
-        "show": true,
-        "maximize": true,
-        "minimize": true,
-        "unmaximize": true,
-        "unminimize": true,
-        "startDragging": true
-      },
-      "protocol": {
-        "all": true,
-        "asset": true,
-        "assetScope": {
-          "allow": ["**"]
-        }
-      }
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.forestoffice.staffmanagement",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ]
-    },
+  "app": {
+    "withGlobalTauri": false,
     "security": {
-      "csp": null
+      "csp": null,
+      "assetProtocol": {
+        "scope": ["**"]
+      },
+      "pattern": {
+        "use": "brownfield"
+      }
     },
     "windows": [
       {
@@ -69,8 +28,29 @@
         "minWidth": 1000,
         "minHeight": 600,
         "center": true,
-        "resizable": true
+        "resizable": true,
+        "dragDropEnabled": true
       }
     ]
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "fs": {
+      "scope": ["**"]
+    },
+    "dialog": {},
+    "shell": {
+      "open": true
+    }
   }
 }

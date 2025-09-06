@@ -6,6 +6,7 @@ use crate::database::{
 };
 use std::fs;
 use std::path::PathBuf;
+use crate::utils::get_app_data_dir;
 
 fn get_downloads_dir() -> Result<PathBuf, String> {
     if let Some(user_dirs) = directories::UserDirs::new() {
@@ -40,10 +41,7 @@ pub async fn generate_staff_pdf(
     app_handle: AppHandle,
     staff_id: String,
 ) -> Result<String, String> {
-    let app_data_dir = app_handle
-        .path_resolver()
-        .app_data_dir()
-        .ok_or("Failed to resolve app data directory")?;
+    let app_data_dir = get_app_data_dir(&app_handle)?;
 
     let staff = db_get_staff_by_id(&app_data_dir, &staff_id)
         .map_err(|e| format!("Failed to get staff: {}", e))?;
@@ -106,10 +104,7 @@ pub async fn generate_bulk_staff_pdf(
     app_handle: AppHandle,
     staff_ids: Vec<String>,
 ) -> Result<String, String> {
-    let app_data_dir = app_handle
-        .path_resolver()
-        .app_data_dir()
-        .ok_or("Failed to resolve app data directory")?;
+    let app_data_dir = get_app_data_dir(&app_handle)?;
 
     let mut staff_list = Vec::new();
 
@@ -221,10 +216,7 @@ pub async fn generate_staff_preview(
     app_handle: AppHandle,
     staff_id: String,
 ) -> Result<String, String> {
-    let app_data_dir = app_handle
-        .path_resolver()
-        .app_data_dir()
-        .ok_or("Failed to resolve app data directory")?;
+    let app_data_dir = get_app_data_dir(&app_handle)?;
 
     let staff = db_get_staff_by_id(&app_data_dir, &staff_id)
         .map_err(|e| format!("Failed to get staff: {}", e))?;
@@ -237,10 +229,7 @@ pub async fn generate_bulk_staff_preview(
     app_handle: AppHandle,
     staff_ids: Vec<String>,
 ) -> Result<String, String> {
-    let app_data_dir = app_handle
-        .path_resolver()
-        .app_data_dir()
-        .ok_or("Failed to resolve app data directory")?;
+    let app_data_dir = get_app_data_dir(&app_handle)?;
 
     let mut staff_list = Vec::new();
 

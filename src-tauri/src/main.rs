@@ -7,12 +7,19 @@ mod utils;
 
 use commands::{staff::*, print::*};
 use database::operations::initialize_database;
+use tauri_plugin_fs;
+use tauri_plugin_dialog;
+use tauri_plugin_shell;
+use tauri::Manager;
 
 fn main() {
     tauri::Builder::default()
+        .plugin(tauri_plugin_fs::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_shell::init())
         .setup(|app| {
             let app_data_dir = app
-                .path_resolver()
+                .path()
                 .app_data_dir()
                 .expect("failed to resolve app data directory");
 
