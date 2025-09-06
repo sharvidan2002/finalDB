@@ -94,3 +94,4 @@ jest-cache/
 # -----------------------
 # - Keep tauri.conf.json, Cargo.toml, src-tauri/icons (source icons), and migrations committed.
 # - If you want to ignore the generated src-tauri/icons outputs, adjust the icons line above.
+src-tauri/gen/*

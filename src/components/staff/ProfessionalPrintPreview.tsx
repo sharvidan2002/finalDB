@@ -3,7 +3,7 @@ import { Printer, Download, X, FileText, Eye, ZoomIn, ZoomOut } from 'lucide-rea
 import { Button } from '../ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog';
 import { useExportToPDF, useOpenDownloadsFolder } from '../../hooks/usePrint';
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 
 interface ProfessionalPrintPreviewProps {
   isOpen: boolean;
